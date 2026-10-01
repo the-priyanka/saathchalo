@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SaathChalo
 
-## Getting Started
+SaathChalo is an intercity carpooling website for India, built as a portfolio and freelancing project. Drivers share empty seats, passengers split the cost. Rides on the site are sample data.
 
-First, run the development server:
+## Phase 1 (done)
+
+- Home with ride search and popular routes
+- About
+- Search results with filters (price, time of day, rating, verified) and sorting
+- Ride details with a simulated booking card
+
+## Phase 2 (planned)
+
+- Sign up and login
+- Passenger and driver dashboards
+- Real database (Supabase or PostgreSQL) behind the existing data layer
+
+## Tech
+
+Next.js (App Router), TypeScript, Tailwind CSS, lucide-react, Vitest.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run unit tests |
 
-## Learn More
+## How the data works
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Pages and components only call the functions in `src/lib/rides.ts` (`searchRides`, `getRide`, `getDriver`, `getPopularRoutes`). Those functions read mock data from `src/data/`, with ride dates generated relative to today. To add a real backend, replace the internals of `src/lib/rides.ts`. Pages stay unchanged.
