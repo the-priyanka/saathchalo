@@ -11,7 +11,7 @@ export default function DriverCard({ driver }: { driver: Driver }) {
         <div>
           <p className="flex items-center gap-1 text-lg font-semibold text-slate-900">
             {driver.name}
-            {driver.verified && <BadgeCheck className="h-5 w-5 text-accent-600" aria-label="Verified driver" />}
+            {driver.verified && <BadgeCheck className="h-5 w-5 text-accent-700" aria-label="Verified driver" />}
           </p>
           <p className="flex items-center gap-1 text-sm text-slate-600">
             <Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />

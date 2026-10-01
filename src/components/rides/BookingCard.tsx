@@ -46,7 +46,7 @@ export default function BookingCard({ ride }: { ride: Ride }) {
       </button>
 
       {requested && (
-        <p role="status" className="mt-4 flex items-start gap-2 rounded-lg bg-accent-50 p-3 text-sm text-accent-600">
+        <p role="status" className="mt-4 flex items-start gap-2 rounded-lg bg-accent-50 p-3 text-sm text-accent-700">
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           Request sent for {seats} {seats === 1 ? 'seat' : 'seats'}. This is a demo, nothing is saved.
         </p>

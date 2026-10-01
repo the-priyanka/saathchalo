@@ -38,7 +38,7 @@ export default function RideCard({ ride }: { ride: RideWithDriver }) {
             <p className="flex items-center gap-1 font-medium text-slate-900">
               {driver.name}
               {driver.verified && (
-                <BadgeCheck className="h-4 w-4 text-accent-600" aria-label="Verified driver" />
+                <BadgeCheck className="h-4 w-4 text-accent-700" aria-label="Verified driver" />
               )}
             </p>
             <p className="flex items-center gap-1 text-sm text-slate-500">
@@ -47,7 +47,7 @@ export default function RideCard({ ride }: { ride: RideWithDriver }) {
             </p>
           </div>
         </div>
-        <p className="text-sm font-medium text-accent-600">
+        <p className="text-sm font-medium text-accent-700">
           {ride.seatsLeft} {ride.seatsLeft === 1 ? 'seat' : 'seats'} left
         </p>
       </div>

@@ -14,7 +14,7 @@ export default function WhySaathChalo() {
       <ul className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {reasons.map((reason) => (
           <li key={reason.title}>
-            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-100 text-accent-600">
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-accent-100 text-accent-700">
               <reason.icon className="h-5 w-5" aria-hidden="true" />
             </span>
             <h3 className="mt-4 font-semibold text-slate-900">{reason.title}</h3>
