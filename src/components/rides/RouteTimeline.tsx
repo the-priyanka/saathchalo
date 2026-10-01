@@ -7,7 +7,7 @@ export default function RouteTimeline({ ride }: { ride: Ride }) {
       <p className="text-sm text-slate-500">{formatDate(ride.departureTime)}</p>
       <ol className="mt-4">
         <li className="relative flex gap-4 pb-8">
-          <span className="absolute left-[4.6rem] top-3 h-full w-px bg-slate-300" aria-hidden="true" />
+          <span className="absolute left-[5.375rem] top-3 h-full w-px bg-slate-300" aria-hidden="true" />
           <p className="w-16 shrink-0 text-right font-semibold text-slate-900">
             {formatTime(ride.departureTime)}
           </p>
