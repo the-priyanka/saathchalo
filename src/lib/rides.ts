@@ -1,90 +1,95 @@
-import { drivers } from '@/data/drivers';
-import { buildRides } from '@/data/rides';
+import { createPublicClient } from '@/lib/supabase/public';
+import {
+  aggregatePopularRoutes,
+  escapeLike,
+  filterByDriver,
+  filterByTimeOfDay,
+  istDayRange,
+  sortRides,
+} from './ride-filters';
+import {
+  mapProfile,
+  mapRide,
+  type ProfileRow,
+  type RideWithDriverRow,
+} from './ride-mapping';
 import type {
   Driver,
   PopularRoute,
-  Ride,
   RideFilters,
   RideWithDriver,
   SearchQuery,
   SortKey,
-  TimeOfDay,
 } from './types';
 
-const normalize = (value: string) => value.trim().toLowerCase();
+const RIDE_SELECT = '*, driver:profiles(*)';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-/** Departure times carry the IST offset, so the hour in the string is the IST hour. */
-function timeOfDayOf(ride: Ride): TimeOfDay {
-  const hour = Number(ride.departureTime.slice(11, 13));
-  if (hour >= 5 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 17) return 'afternoon';
-  return 'evening';
+export class RidesUnavailableError extends Error {
+  constructor(detail?: string) {
+    super(`Rides could not be loaded${detail ? `: ${detail}` : ''}`);
+    this.name = 'RidesUnavailableError';
+  }
 }
-
-function attachDriver(ride: Ride): RideWithDriver {
-  const driver = drivers.find((d) => d.id === ride.driverId);
-  if (!driver) throw new Error(`Ride ${ride.id} references unknown driver ${ride.driverId}`);
-  return { ...ride, driver };
-}
-
-const comparators: Record<SortKey, (a: RideWithDriver, b: RideWithDriver) => number> = {
-  earliest: (a, b) => a.departureTime.localeCompare(b.departureTime),
-  cheapest: (a, b) =>
-    a.pricePerSeat - b.pricePerSeat || a.departureTime.localeCompare(b.departureTime),
-  'best-rated': (a, b) =>
-    b.driver.rating - a.driver.rating || a.departureTime.localeCompare(b.departureTime),
-};
 
 export async function searchRides(
   query: SearchQuery = {},
   filters: RideFilters = {},
   sort: SortKey = 'earliest',
 ): Promise<RideWithDriver[]> {
-  return buildRides(new Date())
-    .map(attachDriver)
-    .filter((r) => !query.from || normalize(r.from) === normalize(query.from))
-    .filter((r) => !query.to || normalize(r.to) === normalize(query.to))
-    .filter((r) => !query.date || r.departureTime.slice(0, 10) === query.date)
-    .filter((r) => !query.seats || r.seatsLeft >= query.seats)
-    .filter((r) => filters.maxPrice === undefined || r.pricePerSeat <= filters.maxPrice)
-    .filter((r) => !filters.timeOfDay?.length || filters.timeOfDay.includes(timeOfDayOf(r)))
-    .filter((r) => filters.minRating === undefined || r.driver.rating >= filters.minRating)
-    .filter((r) => !filters.verifiedOnly || r.driver.verified)
-    .sort(comparators[sort]);
+  const supabase = createPublicClient();
+  let request = supabase
+    .from('rides')
+    .select(RIDE_SELECT)
+    .gt('departure_time', new Date().toISOString());
+
+  const from = query.from?.trim();
+  if (from) request = request.ilike('from_city', escapeLike(from));
+  const to = query.to?.trim();
+  if (to) request = request.ilike('to_city', escapeLike(to));
+  if (query.date) {
+    const { start, end } = istDayRange(query.date);
+    request = request.gte('departure_time', start).lt('departure_time', end);
+  }
+  if (query.seats) request = request.gte('seats_left', query.seats);
+  if (filters.maxPrice !== undefined) request = request.lte('price_per_seat', filters.maxPrice);
+
+  const { data, error } = await request;
+  if (error) throw new RidesUnavailableError(error.message);
+
+  const rides = (data as unknown as RideWithDriverRow[]).map(mapRide);
+  return sortRides(filterByDriver(filterByTimeOfDay(rides, filters.timeOfDay), filters), sort);
 }
 
 export async function getRide(id: string): Promise<RideWithDriver | undefined> {
-  const ride = buildRides(new Date()).find((r) => r.id === id);
-  return ride ? attachDriver(ride) : undefined;
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from('rides')
+    .select(RIDE_SELECT)
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw new RidesUnavailableError(error.message);
+  return data ? mapRide(data as unknown as RideWithDriverRow) : undefined;
 }
 
 export async function getDriver(id: string): Promise<Driver | undefined> {
-  return drivers.find((d) => d.id === id);
+  if (!UUID_RE.test(id)) return undefined;
+  const supabase = createPublicClient();
+  const { data, error } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle();
+  if (error) throw new RidesUnavailableError(error.message);
+  return data ? mapProfile(data as unknown as ProfileRow) : undefined;
 }
 
 export async function getPopularRoutes(): Promise<PopularRoute[]> {
-  const byRoute = new Map<string, PopularRoute>();
-  for (const ride of buildRides(new Date())) {
-    const key = `${ride.from}|${ride.to}`;
-    const existing = byRoute.get(key);
-    if (existing) {
-      existing.rideCount += 1;
-      existing.startingPrice = Math.min(existing.startingPrice, ride.pricePerSeat);
-    } else {
-      byRoute.set(key, {
-        from: ride.from,
-        to: ride.to,
-        startingPrice: ride.pricePerSeat,
-        rideCount: 1,
-      });
-    }
-  }
-  return [...byRoute.values()]
-    .sort(
-      (a, b) =>
-        b.rideCount - a.rideCount ||
-        a.startingPrice - b.startingPrice ||
-        a.from.localeCompare(b.from),
-    )
-    .slice(0, 6);
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from('rides')
+    .select('from_city, to_city, price_per_seat')
+    .gt('departure_time', new Date().toISOString());
+  if (error) throw new RidesUnavailableError(error.message);
+
+  const rows = data as unknown as { from_city: string; to_city: string; price_per_seat: number }[];
+  return aggregatePopularRoutes(
+    rows.map((row) => ({ from: row.from_city, to: row.to_city, pricePerSeat: row.price_per_seat })),
+  );
 }
