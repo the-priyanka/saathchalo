@@ -5,6 +5,7 @@ import Avatar from '@/components/ui/Avatar';
 import { getCurrentUser } from '@/lib/auth';
 
 export const metadata: Metadata = { title: 'My account' };
+export const dynamic = 'force-dynamic';
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
