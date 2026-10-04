@@ -60,8 +60,19 @@ async function dataLayerChecks() {
   const popular = await getPopularRoutes();
   check('popular routes', popular.length === 6 && popular[0].from === 'Delhi' && popular[0].to === 'Chandigarh' && popular[0].startingPrice === 400 && popular[0].rideCount === 3, popular[0]);
 
+  check('wildcard * in city search matches nothing', (await searchRides({ from: 'Del*' })).length === 0);
+  for (const raw of ['%', '_', '\\']) {
+    try {
+      check(`city search with ${raw} matches nothing`, (await searchRides({ from: raw })).length === 0);
+    } catch (error) {
+      check(`city search with ${raw} does not throw`, false, error instanceof Error ? error.message : error);
+    }
+  }
+
   const { data: rideToModify } = await admin.from('rides').select('id').eq('is_demo', true).limit(1).single();
-  if (rideToModify?.id) {
+  if (!rideToModify?.id) {
+    check('found a demo ride for the past-ride check', false);
+  } else {
     const { error: updateError } = await admin
       .from('rides')
       .update({ departure_time: new Date(Date.now() - 3600_000).toISOString() })
@@ -72,7 +83,8 @@ async function dataLayerChecks() {
       try {
         check('past rides are excluded from search', (await searchRides()).length === 13);
       } finally {
-        await admin.rpc('refresh_demo_rides');
+        const { error: restoreError } = await admin.rpc('refresh_demo_rides');
+        check('demo rides restored after the past-ride check', restoreError === null, restoreError?.message);
       }
     }
   }
@@ -85,11 +97,14 @@ async function rlsChecks() {
     return;
   }
 
-  const insert = await anon.from('rides').insert({ id: 'rls-test', driver_id: rohan.id });
-  check('anon cannot insert rides', insert.error !== null);
+  const ridePayload = (id: string) => ({ id, driver_id: rohan.id, from_city: 'A', to_city: 'B', pickup_point: 'x', drop_point: 'y', departure_time: new Date().toISOString(), duration_mins: 10, price_per_seat: 1, seats_left: 1, seats_total: 1, car_model: 'c', car_color: 'c' });
+  const denied = (error: { code?: string } | null) => error?.code === '42501';
+
+  const insert = await anon.from('rides').insert(ridePayload('rls-test'));
+  check('anon cannot insert rides', denied(insert.error), insert.error);
 
   const anonUpdate = await anon.from('profiles').update({ bio: 'hacked' }).eq('id', rohan.id).select();
-  check('anon cannot update profiles', anonUpdate.error !== null || (anonUpdate.data ?? []).length === 0);
+  check('anon cannot update profiles', anonUpdate.error === null ? (anonUpdate.data ?? []).length === 0 : denied(anonUpdate.error), anonUpdate.error ?? anonUpdate.data);
 
   const signIn = await anon.auth.signInWithPassword({ email: DEMO_USER.email, password: DEMO_USER.password });
   const demoId = signIn.data.user?.id;
@@ -101,16 +116,16 @@ async function rlsChecks() {
   await anon.from('profiles').update({ bio: '' }).eq('id', demoId);
 
   const ownRating = await anon.from('profiles').update({ rating: 5 }).eq('id', demoId).select();
-  check('user cannot change their own rating', ownRating.error !== null, ownRating.data);
+  check('user cannot change their own rating', denied(ownRating.error), ownRating.error ?? ownRating.data);
 
   const ownVerified = await anon.from('profiles').update({ verified: true }).eq('id', demoId).select();
-  check('user cannot change their own verified flag', ownVerified.error !== null, ownVerified.data);
+  check('user cannot change their own verified flag', denied(ownVerified.error), ownVerified.error ?? ownVerified.data);
 
   const other = await anon.from('profiles').update({ bio: 'hacked' }).eq('id', rohan.id).select();
-  check("user cannot edit someone else's profile", other.error !== null || (other.data ?? []).length === 0);
+  check("user cannot edit someone else's profile", other.error === null ? (other.data ?? []).length === 0 : denied(other.error), other.error ?? other.data);
 
-  const ride = await anon.from('rides').insert({ id: 'rls-test-2', driver_id: rohan.id, from_city: 'A', to_city: 'B', pickup_point: 'x', drop_point: 'y', departure_time: new Date().toISOString(), duration_mins: 10, price_per_seat: 1, seats_left: 1, seats_total: 1, car_model: 'c', car_color: 'c' });
-  check("user cannot create a ride for someone else", ride.error !== null);
+  const ride = await anon.from('rides').insert(ridePayload('rls-test-2'));
+  check('user cannot create a ride for someone else', denied(ride.error), ride.error);
 }
 
 async function refreshCheck() {
