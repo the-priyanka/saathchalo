@@ -37,6 +37,7 @@ async function dataLayerChecks() {
   const route = { from: 'Delhi', to: 'Chandigarh' };
 
   check('14 upcoming rides', (await searchRides()).length === 14);
+  check('every searched ride has a driver attached', (await searchRides()).every((r) => r.driver && r.driver.name.length > 0));
   check('route search is case-insensitive and ordered by time', same(ids(await searchRides({ from: ' delhi ', to: 'CHANDIGARH' })), ['r1', 'r2', 'r3']));
   check('unknown route is empty', (await searchRides({ from: 'Delhi', to: 'Pune' })).length === 0);
   check('date filter day 1', same(ids(await searchRides({ ...route, date: istDate(1) })), ['r1', 'r2']));
@@ -54,9 +55,27 @@ async function dataLayerChecks() {
   check('getRide unknown id is undefined', (await getRide('nope')) === undefined);
   check('getDriver returns a driver', r1 !== undefined && (await getDriver(r1.driverId))?.name === 'Rohan Mehta');
   check('getDriver with a non-uuid is undefined', (await getDriver('zzz')) === undefined);
+  check('getDriver with an unknown uuid is undefined', (await getDriver('00000000-0000-0000-0000-000000000000')) === undefined);
 
   const popular = await getPopularRoutes();
   check('popular routes', popular.length === 6 && popular[0].from === 'Delhi' && popular[0].to === 'Chandigarh' && popular[0].startingPrice === 400 && popular[0].rideCount === 3, popular[0]);
+
+  const { data: rideToModify } = await admin.from('rides').select('id').eq('is_demo', true).limit(1).single();
+  if (rideToModify?.id) {
+    const { error: updateError } = await admin
+      .from('rides')
+      .update({ departure_time: new Date(Date.now() - 3600_000).toISOString() })
+      .eq('id', rideToModify.id);
+    if (updateError) {
+      check('past rides are excluded from search', false, updateError.message);
+    } else {
+      try {
+        check('past rides are excluded from search', (await searchRides()).length === 13);
+      } finally {
+        await admin.rpc('refresh_demo_rides');
+      }
+    }
+  }
 }
 
 async function rlsChecks() {
@@ -98,12 +117,11 @@ async function refreshCheck() {
   const { error } = await admin.rpc('refresh_demo_rides');
   check('refresh_demo_rides runs', error === null, error?.message);
   const { data } = await admin.from('rides').select('departure_time').eq('is_demo', true);
-  const now = Date.now();
   const ok = (data ?? []).length === 14 && (data ?? []).every((row) => {
-    const t = Date.parse(row.departure_time);
-    return t > now && t < now + 15 * 24 * 60 * 60 * 1000;
+    const day = new Date(Date.parse(row.departure_time) + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    return day >= istDate(1) && day <= istDate(14);
   });
-  check('every demo ride is between now and 15 days ahead', ok);
+  check('every demo ride is 1 to 14 IST days ahead', ok);
 }
 
 async function main() {
