@@ -103,3 +103,9 @@ create policy "drivers delete their own rides"
   using (driver_id = (select auth.uid()) and is_demo = false);
 
 revoke insert, update, delete on public.rides from anon;
+
+-- Explicit grants so access does not depend on project default privileges.
+grant select on public.profiles to anon, authenticated;
+grant select on public.rides to anon, authenticated;
+grant insert, update, delete on public.rides to authenticated;
+grant all on public.profiles, public.rides to service_role;
