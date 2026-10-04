@@ -63,3 +63,5 @@ Pages and components only call the functions in `src/lib/rides.ts` (`searchRides
 
 - Free tier Supabase projects pause after about a week without activity. Restore the project in the dashboard before sharing the link.
 - The default Supabase email sender allows only a few emails per hour. Use the demo login to see the signed-in experience without signing up.
+- After restoring a paused project, run `npm run db:seed` (or wait for the 00:05 IST job) so the demo rides are in the future again. The nightly job does not run while the project is paused.
+- If the demo account is changed by a visitor (name, bio, or password), run `npm run db:seed` to reset it.
