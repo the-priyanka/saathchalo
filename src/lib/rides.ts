@@ -22,6 +22,8 @@ import type {
   SortKey,
 } from './types';
 
+/** Postgres integer upper bound, so a crafted maxPrice cannot break the query. */
+const MAX_PRICE_LIMIT = 2147483647;
 const RIDE_SELECT = '*, driver:profiles(*)';
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -52,7 +54,7 @@ export async function searchRides(
     request = request.gte('departure_time', start).lt('departure_time', end);
   }
   if (query.seats) request = request.gte('seats_left', query.seats);
-  if (filters.maxPrice !== undefined) request = request.lte('price_per_seat', filters.maxPrice);
+  if (filters.maxPrice !== undefined) request = request.lte('price_per_seat', Math.min(filters.maxPrice, MAX_PRICE_LIMIT));
 
   const { data, error } = await request;
   if (error) throw new RidesUnavailableError(error.message);

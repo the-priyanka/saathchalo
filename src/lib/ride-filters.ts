@@ -63,13 +63,14 @@ export function aggregatePopularRoutes(
       (a, b) =>
         b.rideCount - a.rideCount ||
         a.startingPrice - b.startingPrice ||
-        a.from.localeCompare(b.from),
+        a.from.localeCompare(b.from) ||
+        a.to.localeCompare(b.to),
     )
     .slice(0, 6);
 }
 
 export function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+  return value.replace(/[\\%_*]/g, (char) => `\\${char}`);
 }
 
 /** The UTC instants that bound one IST calendar day, for example 2026-10-02. */

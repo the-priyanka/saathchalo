@@ -89,6 +89,14 @@ describe('aggregatePopularRoutes', () => {
     expect(routes[1]).toEqual({ from: 'Bengaluru', to: 'Mysuru', startingPrice: 250, rideCount: 2 });
   });
 
+  it('breaks full ties by destination name', () => {
+    const routes = aggregatePopularRoutes([
+      { from: 'Delhi', to: 'Pune', pricePerSeat: 300 },
+      { from: 'Delhi', to: 'Agra', pricePerSeat: 300 },
+    ]);
+    expect(routes.map((r) => r.to)).toEqual(['Agra', 'Pune']);
+  });
+
   it('returns an empty list for no rides', () => {
     expect(aggregatePopularRoutes([])).toEqual([]);
   });
@@ -98,6 +106,7 @@ describe('escapeLike', () => {
   it('escapes LIKE wildcards and the escape character', () => {
     expect(escapeLike('50%_off\\')).toBe('50\\%\\_off\\\\');
     expect(escapeLike('Delhi')).toBe('Delhi');
+    expect(escapeLike('Del*')).toBe('Del\\*');
   });
 });
 
