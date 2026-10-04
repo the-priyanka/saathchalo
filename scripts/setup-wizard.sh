@@ -56,6 +56,7 @@ echo
 
 bold "Step 3 of 6: email codes (OTP)"
 echo "Open Authentication, then Sign In / Providers, then Email. Make sure 'Confirm email' is ON."
+echo "In the same Email provider screen, set 'Email OTP Length' to 6 and keep 'Email OTP Expiration' at 3600."
 echo "Then open Authentication, then Emails (Templates). Edit two templates."
 echo
 echo "A) Template 'Confirm signup'. Subject: Your SaathChalo verification code. Body:"
