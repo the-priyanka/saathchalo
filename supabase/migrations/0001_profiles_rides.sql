@@ -8,7 +8,9 @@ create table public.profiles (
   review_count integer not null default 0 check (review_count >= 0),
   verified boolean not null default false,
   member_since integer not null default (extract(year from now())::integer),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  constraint profiles_full_name_check check (char_length(trim(full_name)) between 1 and 80),
+  constraint profiles_bio_check check (char_length(bio) <= 500)
 );
 
 create function public.handle_new_user()
@@ -21,7 +23,7 @@ begin
   insert into public.profiles (id, full_name)
   values (
     new.id,
-    coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1))
+    coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'Traveller')
   );
   return new;
 end;
@@ -54,7 +56,9 @@ create table public.rides (
   demo_day_offset integer check (demo_day_offset between 1 and 14),
   demo_time time,
   created_at timestamptz not null default now(),
-  constraint rides_seats_check check (seats_left >= 0 and seats_left <= seats_total)
+  constraint rides_seats_check check (seats_left >= 0 and seats_left <= seats_total),
+  constraint rides_seats_total_check check (seats_total > 0),
+  constraint rides_demo_fields_check check (not is_demo or (demo_day_offset is not null and demo_time is not null))
 );
 
 create index rides_route_time_idx on public.rides (from_city, to_city, departure_time);
