@@ -50,7 +50,7 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
 export async function verifyOtpAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = validateEmail(text(formData, 'email'));
   const code = validateOtpCode(text(formData, 'code'));
-  if (!email.ok) return { error: 'Something is wrong with the link. Please sign up again.' };
+  if (!email.ok) return { error: 'We could not read your email address. Please sign up again.' };
   if (!code.ok) return { fieldErrors: code.errors };
 
   const supabase = await createClient();
@@ -65,7 +65,7 @@ export async function verifyOtpAction(_prev: FormState, formData: FormData): Pro
 
 export async function resendOtpAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = validateEmail(text(formData, 'email'));
-  if (!email.ok) return { error: 'Something is wrong with the link. Please sign up again.' };
+  if (!email.ok) return { error: 'We could not read your email address. Please sign up again.' };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resend({ type: 'signup', email: email.value });
@@ -120,7 +120,13 @@ export async function resetPasswordAction(_prev: FormState, formData: FormData):
     code: text(formData, 'code'),
     password: text(formData, 'password'),
   });
-  if (!parsed.ok) return { fieldErrors: parsed.errors };
+  if (!parsed.ok) {
+    // The reset form has no email field, so an email error means the page itself is broken.
+    if (parsed.errors.email) {
+      return { error: 'Something is wrong with this page. Request a new code from Forgot password.' };
+    }
+    return { fieldErrors: parsed.errors };
+  }
 
   const supabase = await createClient();
   const verified = await supabase.auth.verifyOtp({
