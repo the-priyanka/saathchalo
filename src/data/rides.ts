@@ -1,6 +1,6 @@
 import type { Ride } from '@/lib/types';
 
-type RideTemplate = Omit<Ride, 'departureTime'> & {
+export type RideTemplate = Omit<Ride, 'departureTime'> & {
   /** Days after today (IST). Must be between 1 and 14. */
   dayOffset: number;
   /** HH:MM, 24 hour, IST */
@@ -10,7 +10,7 @@ type RideTemplate = Omit<Ride, 'departureTime'> & {
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const templates: RideTemplate[] = [
+export const rideTemplates: RideTemplate[] = [
   {
     id: 'r1', from: 'Delhi', to: 'Chandigarh', pickupPoint: 'Kashmere Gate ISBT', dropPoint: 'Sector 17 ISBT',
     dayOffset: 1, time: '06:30', durationMins: 300, pricePerSeat: 450, seatsLeft: 3, seatsTotal: 4, driverId: 'd1',
@@ -102,7 +102,7 @@ export function buildRides(now: Date): Ride[] {
   const ist = new Date(now.getTime() + IST_OFFSET_MS);
   const todayUtcMidnight = Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate());
 
-  return templates.map(({ dayOffset, time, ...ride }) => {
+  return rideTemplates.map(({ dayOffset, time, ...ride }) => {
     const date = new Date(todayUtcMidnight + dayOffset * DAY_MS).toISOString().slice(0, 10);
     return { ...ride, departureTime: `${date}T${time}:00+05:30` };
   });
