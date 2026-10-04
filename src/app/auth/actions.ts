@@ -105,8 +105,10 @@ export async function requestResetAction(_prev: FormState, formData: FormData): 
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.value);
-  // Unknown emails return no error, so the response never reveals whether an account exists.
-  if (error && (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit')) {
+  // Only the IP-scoped limit is surfaced. The per-email limit (over_email_send_rate_limit) applies only to
+  // real accounts, so returning it would reveal whether an email is registered. Every other error falls
+  // through to the same redirect as success.
+  if (error && error.code === 'over_request_rate_limit') {
     return { error: authErrorMessage(error.code) };
   }
   redirect(`/reset-password?email=${encodeURIComponent(email.value)}`);
@@ -129,7 +131,13 @@ export async function resetPasswordAction(_prev: FormState, formData: FormData):
   if (verified.error) return { error: authErrorMessage(verified.error.code) };
 
   const updated = await supabase.auth.updateUser({ password: parsed.value.password });
-  if (updated.error) return { error: authErrorMessage(updated.error.code) };
+  if (updated.error) {
+    return {
+      error:
+        authErrorMessage(updated.error.code) +
+        ' Your code was already used, so please request a new one from the Forgot password page.',
+    };
+  }
   redirect('/account');
 }
 
