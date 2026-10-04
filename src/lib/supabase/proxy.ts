@@ -13,12 +13,14 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet, headers) {
         for (const { name, value } of cookiesToSet) request.cookies.set(name, value);
         response = NextResponse.next({ request });
         for (const { name, value, options } of cookiesToSet) {
           response.cookies.set(name, value, options);
         }
+        // Prevents CDNs from caching responses that set auth cookies.
+        Object.entries(headers).forEach(([key, value]) => response.headers.set(key, value));
       },
     },
   });
