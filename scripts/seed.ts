@@ -72,7 +72,12 @@ async function main() {
   console.log(`Seeded ${drivers.length} demo drivers.`);
 
   // 2. Demo user for visitors to log in with.
-  await ensureUser(DEMO_USER.email, DEMO_USER.password, DEMO_USER.fullName);
+  const demoId = await ensureUser(DEMO_USER.email, DEMO_USER.password, DEMO_USER.fullName);
+  const { error: demoResetError } = await admin
+    .from('profiles')
+    .update({ bio: '', full_name: DEMO_USER.fullName })
+    .eq('id', demoId);
+  if (demoResetError) throw demoResetError;
   console.log(`Demo user ready: ${DEMO_USER.email}`);
 
   // 3. Demo rides: replace all of them.
