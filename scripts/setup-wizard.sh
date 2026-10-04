@@ -8,11 +8,11 @@ bold() { printf '\033[1m%s\033[0m\n' "$1"; }
 pause() { read -r -p "Press Enter when done... " _; }
 copy_hint() {
   # $1 = file or text source description, stdin = content
-  if command -v pbcopy >/dev/null 2>&1; then
-    pbcopy
+  if command -v pbcopy >/dev/null 2>&1 && pbcopy; then
     echo "(Copied to your clipboard.)"
   else
-    echo "(No clipboard tool found, copy the text printed above by hand.)"
+    cat >/dev/null || true
+    echo "(Could not use the clipboard. Open the file yourself and copy its contents.)"
   fi
 }
 
@@ -37,7 +37,8 @@ if [ -f .env.local ]; then
   if [ "${overwrite:-N}" != "y" ] && [ "${overwrite:-N}" != "Y" ]; then
     echo "Keeping the existing .env.local."
   else
-    rm .env.local
+    mv .env.local .env.local.bak
+    echo "The old file was kept as .env.local.bak."
   fi
 fi
 if [ ! -f .env.local ]; then
@@ -95,8 +96,14 @@ read -r -p "Run 'npm run db:seed' and 'npm run db:check' now? [Y/n] " run_now
 if [ "${run_now:-Y}" = "n" ] || [ "${run_now:-Y}" = "N" ]; then
   echo "Later, run: npm run db:seed && npm run db:check"
 else
-  npm run db:seed
-  npm run db:check
+  if ! npm run db:seed; then
+    echo "Seed failed. Check that both SQL files ran and the keys in .env.local are right."
+    exit 1
+  fi
+  if ! npm run db:check; then
+    echo "Some checks failed. Read the FAIL lines above."
+    exit 1
+  fi
 fi
 echo
 bold "Done. Start the app with: npm run dev"
