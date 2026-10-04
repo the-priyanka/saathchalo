@@ -3,6 +3,7 @@
 import { Car, Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { signOutAction } from '@/app/auth/actions';
 
 const links = [
   { href: '/', label: 'Home' },
@@ -10,8 +11,16 @@ const links = [
   { href: '/about', label: 'About' },
 ];
 
-export default function Navbar() {
+const outlineButton =
+  'rounded-full border border-brand-600 px-4 py-2 text-center text-sm font-semibold text-brand-600 hover:bg-brand-50';
+const solidButton =
+  'rounded-full bg-brand-600 px-4 py-2 text-center text-sm font-semibold text-white hover:bg-brand-700';
+
+type Props = { user: { fullName: string } | null };
+
+export default function Navbar({ user }: Props) {
   const [open, setOpen] = useState(false);
+  const firstName = user?.fullName.split(' ')[0];
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
@@ -32,18 +41,30 @@ export default function Navbar() {
         </ul>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link
-            href="/coming-soon"
-            className="rounded-full border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50"
-          >
+          <Link href="/coming-soon" className={outlineButton}>
             Offer a ride
           </Link>
-          <Link
-            href="/coming-soon"
-            className="rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700"
-          >
-            Log in
-          </Link>
+          {user ? (
+            <>
+              <Link href="/account" className="text-sm font-medium text-slate-700 hover:text-brand-600">
+                Hi, {firstName}
+              </Link>
+              <form action={signOutAction}>
+                <button type="submit" className={solidButton}>
+                  Log out
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-brand-600">
+                Log in
+              </Link>
+              <Link href="/signup" className={solidButton}>
+                Sign up
+              </Link>
+            </>
+          )}
         </div>
 
         <button
@@ -71,23 +92,42 @@ export default function Navbar() {
                 </Link>
               </li>
             ))}
+            {user && (
+              <li>
+                <Link
+                  href="/account"
+                  onClick={() => setOpen(false)}
+                  className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
+                >
+                  My account
+                </Link>
+              </li>
+            )}
           </ul>
           <div className="mt-4 flex gap-3">
-            <Link
-              href="/coming-soon"
-              onClick={() => setOpen(false)}
-              className="flex-1 rounded-full border border-brand-600 px-4 py-2 text-center text-sm font-semibold text-brand-600"
-            >
+            <Link href="/coming-soon" onClick={() => setOpen(false)} className={`flex-1 ${outlineButton}`}>
               Offer a ride
             </Link>
-            <Link
-              href="/coming-soon"
-              onClick={() => setOpen(false)}
-              className="flex-1 rounded-full bg-brand-600 px-4 py-2 text-center text-sm font-semibold text-white"
-            >
-              Log in
-            </Link>
+            {user ? (
+              <form action={signOutAction} className="flex-1">
+                <button type="submit" className={`w-full ${solidButton}`}>
+                  Log out
+                </button>
+              </form>
+            ) : (
+              <Link href="/signup" onClick={() => setOpen(false)} className={`flex-1 ${solidButton}`}>
+                Sign up
+              </Link>
+            )}
           </div>
+          {!user && (
+            <p className="mt-3 text-center text-sm text-slate-600">
+              Already have an account?{' '}
+              <Link href="/login" onClick={() => setOpen(false)} className="font-semibold text-brand-600">
+                Log in
+              </Link>
+            </p>
+          )}
         </div>
       )}
     </header>
