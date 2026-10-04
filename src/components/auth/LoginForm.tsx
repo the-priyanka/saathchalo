@@ -16,7 +16,7 @@ export default function LoginForm({ next }: { next: string }) {
   return (
     <form action={action} className="space-y-4" noValidate>
       <input type="hidden" name="next" value={next} />
-      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" error={errors.email} />
+      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" defaultValue={state.values?.email} error={errors.email} />
       <FormField label="Password" name="password" type="password" autoComplete="current-password" error={errors.password} />
       <p className="text-right text-sm">
         <Link href="/forgot-password" className="font-medium text-brand-600 hover:underline">

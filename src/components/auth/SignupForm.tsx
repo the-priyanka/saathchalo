@@ -15,8 +15,8 @@ export default function SignupForm({ next }: { next: string }) {
   return (
     <form action={action} className="space-y-4" noValidate>
       <input type="hidden" name="next" value={next} />
-      <FormField label="Full name" name="fullName" autoComplete="name" error={errors.fullName} />
-      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" error={errors.email} />
+      <FormField label="Full name" name="fullName" autoComplete="name" defaultValue={state.values?.fullName} error={errors.fullName} />
+      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" defaultValue={state.values?.email} error={errors.email} />
       <FormField label="Password" name="password" type="password" autoComplete="new-password" error={errors.password} />
       <p className="text-xs text-slate-500">At least 8 characters. We will email you a 6 digit code to verify your address.</p>
       {state.error && (

@@ -25,12 +25,13 @@ function verifyHref(email: string, next: string): string {
 }
 
 export async function signUpAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const values = { email: text(formData, 'email').trim(), fullName: text(formData, 'fullName').trim() };
   const parsed = validateSignup({
     fullName: text(formData, 'fullName'),
     email: text(formData, 'email'),
     password: text(formData, 'password'),
   });
-  if (!parsed.ok) return { fieldErrors: parsed.errors };
+  if (!parsed.ok) return { fieldErrors: parsed.errors, values };
   const next = safeNextPath(text(formData, 'next'));
 
   const supabase = await createClient();
@@ -39,10 +40,10 @@ export async function signUpAction(_prev: FormState, formData: FormData): Promis
     password: parsed.value.password,
     options: { data: { full_name: parsed.value.fullName } },
   });
-  if (error) return { error: authErrorMessage(error.code) };
+  if (error) return { error: authErrorMessage(error.code), values };
   // With email confirmation on, Supabase hides existing accounts by returning a user without identities.
   if (data.user && data.user.identities?.length === 0) {
-    return { error: authErrorMessage('user_already_exists') };
+    return { error: authErrorMessage('user_already_exists'), values };
   }
   redirect(verifyHref(parsed.value.email, next));
 }
@@ -74,11 +75,12 @@ export async function resendOtpAction(_prev: FormState, formData: FormData): Pro
 }
 
 export async function signInAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const values = { email: text(formData, 'email').trim() };
   const parsed = validateLogin({
     email: text(formData, 'email'),
     password: text(formData, 'password'),
   });
-  if (!parsed.ok) return { fieldErrors: parsed.errors };
+  if (!parsed.ok) return { fieldErrors: parsed.errors, values };
   const next = safeNextPath(text(formData, 'next'));
 
   const supabase = await createClient();
@@ -88,7 +90,7 @@ export async function signInAction(_prev: FormState, formData: FormData): Promis
       await supabase.auth.resend({ type: 'signup', email: parsed.value.email });
       redirect(verifyHref(parsed.value.email, next));
     }
-    return { error: authErrorMessage(error.code) };
+    return { error: authErrorMessage(error.code), values };
   }
   redirect(next);
 }
@@ -101,7 +103,8 @@ export async function signOutAction(): Promise<void> {
 
 export async function requestResetAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const email = validateEmail(text(formData, 'email'));
-  if (!email.ok) return { fieldErrors: email.errors };
+  const values = { email: text(formData, 'email').trim() };
+  if (!email.ok) return { fieldErrors: email.errors, values };
 
   const supabase = await createClient();
   const { error } = await supabase.auth.resetPasswordForEmail(email.value);
@@ -109,7 +112,7 @@ export async function requestResetAction(_prev: FormState, formData: FormData): 
   // real accounts, so returning it would reveal whether an email is registered. Every other error falls
   // through to the same redirect as success.
   if (error && error.code === 'over_request_rate_limit') {
-    return { error: authErrorMessage(error.code) };
+    return { error: authErrorMessage(error.code), values };
   }
   redirect(`/reset-password?email=${encodeURIComponent(email.value)}`);
 }

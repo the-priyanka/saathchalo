@@ -14,7 +14,7 @@ export default function ForgotPasswordForm() {
 
   return (
     <form action={action} className="space-y-4" noValidate>
-      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" error={errors.email} />
+      <FormField label="Email" name="email" type="email" autoComplete="email" inputMode="email" defaultValue={state.values?.email} error={errors.email} />
       {state.error && (
         <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">
           {state.error}
