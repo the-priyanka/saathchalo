@@ -16,10 +16,16 @@ SaathChalo is an intercity carpooling website for India, built as a portfolio an
 - Protected account page with an editable bio
 - Demo rides refresh every night with `pg_cron`, so the live demo never goes stale
 
-## Phase 2B and 2C (planned)
+## Phase 2B (done)
 
-- Driver side: offer a ride, my rides, booking requests
-- Passenger side: book a seat, my bookings
+- Offer a ride (`/rides/new`) and My rides (`/my-rides`): signed-in users can post a ride, see their own rides, and edit or delete upcoming ones
+- Rules enforced in the database: price 50 to 5000 INR, 1 to 6 seats, 15 minutes to 24 hours, departure from 1 hour to 90 days ahead, at most 10 upcoming rides per user
+- Posts from the shared demo account are cleaned up every night
+- Run `supabase/migrations/0003_driver_rides.sql` once in the Supabase SQL editor after the first two migrations
+
+## Phase 2C (planned)
+
+- Passenger side: book a seat, my bookings, booking requests
 
 ## Tech
 

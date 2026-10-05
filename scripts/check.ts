@@ -139,9 +139,137 @@ async function refreshCheck() {
   check('every demo ride is 1 to 14 IST days ahead', ok);
 }
 
+const HOUR_MS = 60 * 60 * 1000;
+const inHours = (hours: number) => new Date(Date.now() + hours * HOUR_MS).toISOString();
+
+const goodRide = (driverId: string, overrides: Record<string, unknown> = {}) => ({
+  driver_id: driverId,
+  from_city: 'Delhi',
+  to_city: 'Jaipur',
+  pickup_point: 'Kashmere Gate',
+  drop_point: 'Sindhi Camp',
+  departure_time: inHours(48),
+  duration_mins: 330,
+  price_per_seat: 500,
+  seats_total: 3,
+  car_model: 'Maruti Swift',
+  car_color: 'White',
+  pref_ac: true,
+  pref_music: false,
+  pref_pets: false,
+  pref_luggage: true,
+  ...overrides,
+});
+
+async function driverRideChecks() {
+  const { data: me } = await anon.auth.getUser();
+  const demoId = me.user?.id;
+  if (!demoId) {
+    check('demo user is signed in for the driver ride checks', false);
+    return;
+  }
+  const code = (error: { code?: string; message?: string } | null) => error?.code;
+  const message = (error: { message?: string } | null) => error?.message ?? '';
+
+  try {
+    // Create, read back, update, and the seats rule.
+    const created = await anon.from('rides').insert(goodRide(demoId)).select('id, seats_left, seats_total').single();
+    const rideId = created.data?.id as string | undefined;
+    check('user can create a valid ride', created.error === null && typeof rideId === 'string', created.error);
+    if (!rideId) return;
+    check('created ride gets a generated id and all seats free', created.data?.seats_left === 3 && created.data?.seats_total === 3 && rideId !== 'r1', created.data);
+    check('created ride appears in search', ids(await searchRides({ from: 'Delhi', to: 'Jaipur' })).includes(rideId));
+
+    const priceUpdate = await anon.from('rides').update({ price_per_seat: 600 }).eq('id', rideId).select('price_per_seat');
+    check('user can edit their own upcoming ride', priceUpdate.error === null && priceUpdate.data?.[0]?.price_per_seat === 600, priceUpdate.error);
+    const seatsUpdate = await anon.from('rides').update({ seats_total: 4 }).eq('id', rideId).select('seats_left, seats_total');
+    check('seats_left follows seats_total on update', seatsUpdate.data?.[0]?.seats_left === 4 && seatsUpdate.data?.[0]?.seats_total === 4, seatsUpdate.data);
+    const edited = await getRide(rideId);
+    check('edited ride shows the new price in search data', edited?.pricePerSeat === 600);
+
+    // Columns clients must never write.
+    const withId = await anon.from('rides').insert({ ...goodRide(demoId), id: 'custom-id' });
+    check('user cannot choose the ride id', code(withId.error) === '42501', withId.error);
+    const withDemo = await anon.from('rides').insert({ ...goodRide(demoId), is_demo: true });
+    check('user cannot set is_demo', code(withDemo.error) === '42501', withDemo.error);
+    const withSeatsLeft = await anon.from('rides').insert({ ...goodRide(demoId), seats_left: 1 });
+    check('user cannot set seats_left', code(withSeatsLeft.error) === '42501', withSeatsLeft.error);
+
+    // Constraints (check violation is 23514).
+    const bad: [string, Record<string, unknown>][] = [
+      ['price below 50', { price_per_seat: 49 }],
+      ['price above 5000', { price_per_seat: 5001 }],
+      ['zero seats', { seats_total: 0 }],
+      ['seven seats', { seats_total: 7 }],
+      ['duration below 15 minutes', { duration_mins: 14 }],
+      ['duration above 24 hours', { duration_mins: 1441 }],
+      ['same city on both sides', { to_city: 'delhi ' }],
+      ['one letter city', { from_city: 'D' }],
+      ['two letter pickup', { pickup_point: 'ab' }],
+    ];
+    for (const [label, overrides] of bad) {
+      const result = await anon.from('rides').insert(goodRide(demoId, overrides));
+      check(`database rejects ${label}`, code(result.error) === '23514', result.error);
+    }
+
+    // Time window.
+    for (const [label, hours] of [['30 minutes ahead', 0.5], ['91 days ahead', 91 * 24], ['in the past', -5]] as [string, number][]) {
+      const result = await anon.from('rides').insert(goodRide(demoId, { departure_time: inHours(hours) }));
+      check(`database rejects a departure ${label}`, message(result.error).includes('ride_time_window'), result.error);
+    }
+    const moveToPast = await anon.from('rides').update({ departure_time: inHours(0.5) }).eq('id', rideId).select('id');
+    check('database rejects moving an upcoming ride into the next hour', message(moveToPast.error).includes('ride_time_window'), moveToPast.error ?? moveToPast.data);
+
+    // Other people's rides.
+    const foreignUpdate = await anon.from('rides').update({ price_per_seat: 100 }).eq('id', 'r1').select('id');
+    check("user cannot edit someone else's ride", foreignUpdate.error !== null || (foreignUpdate.data ?? []).length === 0, foreignUpdate.error ?? foreignUpdate.data);
+    const foreignDelete = await anon.from('rides').delete().eq('id', 'r1').select('id');
+    check("user cannot delete someone else's ride", foreignDelete.error !== null || (foreignDelete.data ?? []).length === 0, foreignDelete.error ?? foreignDelete.data);
+    check('demo ride r1 is untouched', (await getRide('r1'))?.pricePerSeat === 450);
+
+    // Past rides are read only. The service role can create one because it skips the time rules.
+    const past = await admin.from('rides').insert(goodRide(demoId, { departure_time: inHours(-48) })).select('id').single();
+    const pastId = past.data?.id as string | undefined;
+    check('service role can create a past ride for the test', past.error === null && typeof pastId === 'string', past.error);
+    if (pastId) {
+      const pastUpdate = await anon.from('rides').update({ price_per_seat: 100 }).eq('id', pastId).select('id');
+      check('user cannot edit a past ride', pastUpdate.error !== null || (pastUpdate.data ?? []).length === 0, pastUpdate.error ?? pastUpdate.data);
+      const pastDelete = await anon.from('rides').delete().eq('id', pastId).select('id');
+      check('user cannot delete a past ride', pastDelete.error !== null || (pastDelete.data ?? []).length === 0, pastDelete.error ?? pastDelete.data);
+      const stillThere = await admin.from('rides').select('id').eq('id', pastId);
+      check('the past ride is still there', (stillThere.data ?? []).length === 1);
+    }
+
+    // Limit of 10 upcoming rides (one already exists).
+    let createdMore = 0;
+    for (let i = 0; i < 9; i++) {
+      const result = await anon.from('rides').insert(goodRide(demoId, { departure_time: inHours(50 + i) }));
+      if (result.error === null) createdMore += 1;
+    }
+    check('user can create up to 10 upcoming rides', createdMore === 9, createdMore);
+    const eleventh = await anon.from('rides').insert(goodRide(demoId, { departure_time: inHours(70) }));
+    check('the 11th upcoming ride is rejected', message(eleventh.error).includes('ride_limit_reached'), eleventh.error);
+
+    // Delete and the nightly cleanup of rides posted from the demo account.
+    const ownDelete = await anon.from('rides').delete().eq('id', rideId).select('id');
+    check('user can delete their own upcoming ride', ownDelete.error === null && (ownDelete.data ?? []).length === 1, ownDelete.error);
+
+    const refreshed = await admin.rpc('refresh_demo_rides');
+    check('refresh_demo_rides runs after the migration', refreshed.error === null, refreshed.error?.message);
+    const leftovers = await admin.from('rides').select('id').eq('driver_id', demoId).eq('is_demo', false).gt('departure_time', new Date().toISOString());
+    check('refresh removes rides posted from the demo account', (leftovers.data ?? []).length === 0, leftovers.data);
+    const demoRides = await admin.from('rides').select('id').eq('is_demo', true);
+    check('the 14 demo rides are kept', (demoRides.data ?? []).length === 14, demoRides.data?.length);
+  } finally {
+    // Always clean up everything this block created, even if a check crashed.
+    await admin.from('rides').delete().eq('driver_id', demoId).eq('is_demo', false);
+  }
+}
+
 async function main() {
   await dataLayerChecks();
   await rlsChecks();
+  await driverRideChecks();
   await refreshCheck();
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);
