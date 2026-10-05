@@ -1,6 +1,6 @@
 # SaathChalo
 
-SaathChalo is an intercity carpooling website for India, built as a portfolio and freelancing project. Drivers share empty seats, passengers split the cost. Rides on the site are sample data.
+SaathChalo is an intercity carpooling website for India, built as a portfolio and freelancing project. Drivers share empty seats, passengers split the cost. Rides on the site are demo data, and signed-in users can post their own.
 
 ## Phase 1 (done)
 
@@ -59,11 +59,13 @@ This is a normal user with no extra privileges.
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests |
 | `npm run db:seed` | Seed demo drivers, demo rides, and the demo user (safe to re-run) |
-| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, demo refresh. They assume only the demo rides exist: rides posted from the demo account are cleared automatically, so delete rides posted from other test accounts before running |
+| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, driver rides, demo refresh |
+
+The checks assume only the demo rides exist. Rides posted from the demo account are cleared automatically, so delete rides posted from other test accounts before running them.
 
 ## How the data works
 
-Pages and components only call the functions in `src/lib/rides.ts` (`searchRides`, `getRide`, `getDriver`, `getPopularRoutes`). They read from Supabase with a public, read-only client. Row Level Security allows everyone to read rides and profiles, and lets only the owner edit their own profile (name, bio, avatar). The `service_role` key is used only by the scripts in `scripts/` and is never sent to the browser.
+Pages and components only call the functions in `src/lib/rides.ts` (`searchRides`, `getRide`, `getDriver`, `getPopularRoutes`). They read from Supabase with a public, read-only client. Signed-in users write and read their own rides through `src/lib/driver-rides.ts`. Row Level Security allows everyone to read rides and profiles, lets only the owner edit their own profile (name, bio, avatar), and lets only the owner change or delete their own upcoming rides. The `service_role` key is used only by the scripts in `scripts/` and is never sent to the browser.
 
 ## Notes for the portfolio demo
 
