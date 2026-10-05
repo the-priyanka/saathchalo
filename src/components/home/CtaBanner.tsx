@@ -9,7 +9,7 @@ export default function CtaBanner() {
           Share your empty seats, meet good people, and cover your fuel cost.
         </p>
         <Link
-          href="/coming-soon"
+          href="/rides/new"
           className="mt-6 inline-block rounded-full bg-white px-6 py-3 font-semibold text-brand-700 hover:bg-brand-50"
         >
           Offer a ride

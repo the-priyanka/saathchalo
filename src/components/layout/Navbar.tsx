@@ -41,11 +41,14 @@ export default function Navbar({ user }: Props) {
         </ul>
 
         <div className="hidden items-center gap-3 md:flex">
-          <Link href="/coming-soon" className={outlineButton}>
+          <Link href="/rides/new" className={outlineButton}>
             Offer a ride
           </Link>
           {user ? (
             <>
+              <Link href="/my-rides" className="text-sm font-medium text-slate-700 hover:text-brand-600">
+                My rides
+              </Link>
               <Link href="/account" className="text-sm font-medium text-slate-700 hover:text-brand-600">
                 Hi, {firstName}
               </Link>
@@ -93,19 +96,30 @@ export default function Navbar({ user }: Props) {
               </li>
             ))}
             {user && (
-              <li>
-                <Link
-                  href="/account"
-                  onClick={() => setOpen(false)}
-                  className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
-                >
-                  My account
-                </Link>
-              </li>
+              <>
+                <li>
+                  <Link
+                    href="/my-rides"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
+                  >
+                    My rides
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/account"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
+                  >
+                    My account
+                  </Link>
+                </li>
+              </>
             )}
           </ul>
           <div className="mt-4 flex gap-3">
-            <Link href="/coming-soon" onClick={() => setOpen(false)} className={`flex-1 ${outlineButton}`}>
+            <Link href="/rides/new" onClick={() => setOpen(false)} className={`flex-1 ${outlineButton}`}>
               Offer a ride
             </Link>
             {user ? (
