@@ -178,7 +178,7 @@ async function driverRideChecks() {
     const rideId = created.data?.id as string | undefined;
     check('user can create a valid ride', created.error === null && typeof rideId === 'string', created.error);
     if (!rideId) return;
-    check('created ride gets a generated id and all seats free', created.data?.seats_left === 3 && created.data?.seats_total === 3 && rideId !== 'r1', created.data);
+    check('created ride gets a generated id and all seats free', created.data?.seats_left === 3 && created.data?.seats_total === 3 && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rideId), created.data);
     check('created ride appears in search', ids(await searchRides({ from: 'Delhi', to: 'Jaipur' })).includes(rideId));
 
     const priceUpdate = await anon.from('rides').update({ price_per_seat: 600 }).eq('id', rideId).select('price_per_seat');
@@ -195,6 +195,19 @@ async function driverRideChecks() {
     check('user cannot set is_demo', code(withDemo.error) === '42501', withDemo.error);
     const withSeatsLeft = await anon.from('rides').insert({ ...goodRide(demoId), seats_left: 1 });
     check('user cannot set seats_left', code(withSeatsLeft.error) === '42501', withSeatsLeft.error);
+
+    // Protected columns cannot be changed by an update either.
+    const protectedUpdates: [string, Record<string, unknown>][] = [
+      ['seats_left', { seats_left: 1 }],
+      ['is_demo', { is_demo: true }],
+      ['id', { id: 'x' }],
+      ['created_at', { created_at: new Date().toISOString() }],
+      ['driver_id', { driver_id: '00000000-0000-0000-0000-000000000000' }],
+    ];
+    for (const [column, change] of protectedUpdates) {
+      const result = await anon.from('rides').update(change).eq('id', rideId).select('id');
+      check(`database rejects updating ${column}`, code(result.error) === '42501', result.error);
+    }
 
     // Constraints (check violation is 23514).
     const bad: [string, Record<string, unknown>][] = [
@@ -222,6 +235,7 @@ async function driverRideChecks() {
     check('database rejects moving an upcoming ride into the next hour', message(moveToPast.error).includes('ride_time_window'), moveToPast.error ?? moveToPast.data);
 
     // Other people's rides.
+    // If one of these fails the demo ride may be changed: run npm run db:seed to restore it.
     const foreignUpdate = await anon.from('rides').update({ price_per_seat: 100 }).eq('id', 'r1').select('id');
     check("user cannot edit someone else's ride", foreignUpdate.error !== null || (foreignUpdate.data ?? []).length === 0, foreignUpdate.error ?? foreignUpdate.data);
     const foreignDelete = await anon.from('rides').delete().eq('id', 'r1').select('id');
@@ -260,7 +274,7 @@ async function driverRideChecks() {
 
     const refreshed = await admin.rpc('refresh_demo_rides');
     check('refresh_demo_rides runs after the migration', refreshed.error === null, refreshed.error?.message);
-    const leftovers = await admin.from('rides').select('id').eq('driver_id', demoId).eq('is_demo', false).gt('departure_time', new Date().toISOString());
+    const leftovers = await admin.from('rides').select('id').eq('driver_id', demoId).eq('is_demo', false);
     check('refresh removes rides posted from the demo account', (leftovers.data ?? []).length === 0, leftovers.data);
     const demoRides = await admin.from('rides').select('id').eq('is_demo', true);
     check('the 14 demo rides are kept', (demoRides.data ?? []).length === 14, demoRides.data?.length);
