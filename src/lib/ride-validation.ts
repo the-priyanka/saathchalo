@@ -63,7 +63,11 @@ const inRange = (value: number, min: number, max: number) => value >= min && val
 const lengthMessage = (label: string, min: number, max: number) =>
   `${label} must be ${min} to ${max} characters.`;
 
-function parseDeparture(value: string, now: Date): { time: string } | { error: string } {
+function parseDeparture(
+  value: string,
+  now: Date,
+  currentDeparture?: string,
+): { time: string } | { error: string } {
   const text = value.trim();
   if (!DEPARTURE_RE.test(text)) return { error: DEPARTURE_INVALID };
   const instant = new Date(`${text}:00+05:30`);
@@ -71,6 +75,10 @@ function parseDeparture(value: string, now: Date): { time: string } | { error: s
   // Rejects impossible dates that some parsers roll over, such as 2026-02-30.
   if (new Date(instant.getTime() + IST_OFFSET_MS).toISOString().slice(0, 16) !== text) {
     return { error: DEPARTURE_INVALID };
+  }
+  // An unchanged departure on an edit is not re-checked: the database only checks the window when it changes.
+  if (currentDeparture !== undefined && `${text}:00+05:30` === currentDeparture) {
+    return { time: `${text}:00+05:30` };
   }
   const earliest = now.getTime() + HOUR_MS;
   const latest = now.getTime() + 90 * DAY_MS;
@@ -81,6 +89,7 @@ function parseDeparture(value: string, now: Date): { time: string } | { error: s
 export function validateRideInput(
   raw: RideFormRaw,
   now: Date = new Date(),
+  opts?: { currentDeparture?: string },
 ): Validation<RideInput, RideField> {
   const errors: Partial<Record<RideField, string>> = {};
 
@@ -101,7 +110,7 @@ export function validateRideInput(
   if (!inRange(carModel.length, 2, 40)) errors.carModel = lengthMessage('Car model', 2, 40);
   if (!inRange(carColor.length, 2, 40)) errors.carColor = lengthMessage('Car color', 2, 40);
 
-  const departure = parseDeparture(raw.departure, now);
+  const departure = parseDeparture(raw.departure, now, opts?.currentDeparture);
   if ('error' in departure) errors.departure = departure.error;
 
   const hoursText = raw.durationHours.trim() || '0';

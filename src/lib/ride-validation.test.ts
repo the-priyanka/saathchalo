@@ -109,6 +109,31 @@ describe('validateRideInput', () => {
       expect(errorsFor({ departure: '2026-02-30T10:00' })?.departure).toBe(invalid);
       expect(errorsFor({ departure: '2026-10-06T25:00' })?.departure).toBe(invalid);
     });
+
+    describe('when editing an existing ride', () => {
+      const soon = '2026-10-05T10:30';
+      const run = (departure: string, currentDeparture: string) => {
+        const result = validateRideInput({ ...valid, departure }, NOW, { currentDeparture });
+        return result.ok ? undefined : result.errors;
+      };
+
+      it('rejects a departure 30 minutes ahead without options', () => {
+        expect(errorsFor({ departure: soon })?.departure).toBe(message);
+      });
+
+      it('accepts the same departure when it is unchanged', () => {
+        expect(run(soon, '2026-10-05T10:30:00+05:30')).toBeUndefined();
+      });
+
+      it('still rejects a changed departure inside the window', () => {
+        expect(run(soon, '2026-10-05T10:45:00+05:30')?.departure).toBe(message);
+      });
+
+      it('still rejects an invalid format', () => {
+        const invalid = 'Enter a valid departure date and time.';
+        expect(run('tomorrow', '2026-10-05T10:30:00+05:30')?.departure).toBe(invalid);
+      });
+    });
   });
 
   describe('duration', () => {

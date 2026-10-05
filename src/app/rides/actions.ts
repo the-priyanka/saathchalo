@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
-import { createRide, deleteRide, updateRide } from '@/lib/driver-rides';
+import { createRide, deleteRide, getMyRide, updateRide } from '@/lib/driver-rides';
 import type { FormState } from '@/lib/form-state';
 import {
   rideFormRawFromFormData,
@@ -46,7 +46,15 @@ export async function updateRideAction(
 
   const raw = rideFormRawFromFormData(formData);
   const values = rideRawToValues(raw);
-  const parsed = validateRideInput(raw);
+
+  let parsed: ReturnType<typeof validateRideInput>;
+  try {
+    const ride = await getMyRide(id, user.id);
+    if (!ride) return { error: rideWriteMessage('not_found'), values };
+    parsed = validateRideInput(raw, new Date(), { currentDeparture: ride.departureTime });
+  } catch (error) {
+    return { error: messageFor(error), values };
+  }
   if (!parsed.ok) return { fieldErrors: parsed.errors, values };
 
   try {
