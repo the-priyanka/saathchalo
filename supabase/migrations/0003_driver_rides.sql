@@ -54,8 +54,8 @@ begin
   -- Bookings arrive in a later phase. Until then every seat is free.
   new.seats_left := new.seats_total;
 
-  -- Writes without a signed-in user (the service role, migrations) skip the rules below.
-  if (select auth.uid()) is null then
+  -- Writes from roles other than the API roles (the service role, the SQL editor, migrations) skip the rules below.
+  if current_user not in ('anon', 'authenticated') then
     return new;
   end if;
 
