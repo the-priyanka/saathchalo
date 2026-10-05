@@ -9,6 +9,10 @@ type Props = {
   inputMode?: 'numeric' | 'email' | 'text';
   maxLength?: number;
   required?: boolean;
+  list?: string;
+  min?: number | string;
+  max?: number | string;
+  step?: number | string;
 };
 
 export default function FormField({ label, name, error, ...inputProps }: Props) {
