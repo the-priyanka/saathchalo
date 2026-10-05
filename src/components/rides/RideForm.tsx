@@ -52,10 +52,10 @@ export default function RideForm({ action, initial = {}, submitLabel }: Props) {
           <div>
             <span className="mb-1 block text-sm font-medium text-slate-700">Trip duration</span>
             <div className="grid grid-cols-2 gap-3">
-              <FormField label="Hours" name="durationHours" type="number" inputMode="numeric" min={0} max={24} defaultValue={value('durationHours')} />
-              <FormField label="Minutes" name="durationMinutes" type="number" inputMode="numeric" min={0} max={59} defaultValue={value('durationMinutes')} />
+              <FormField label="Hours" name="durationHours" type="number" inputMode="numeric" min={0} max={24} defaultValue={value('durationHours')} invalid={Boolean(errors.duration)} describedBy={errors.duration ? 'duration-error' : undefined} />
+              <FormField label="Minutes" name="durationMinutes" type="number" inputMode="numeric" min={0} max={59} defaultValue={value('durationMinutes')} invalid={Boolean(errors.duration)} describedBy={errors.duration ? 'duration-error' : undefined} />
             </div>
-            {errors.duration && <span className="mt-1 block text-sm text-red-600">{errors.duration}</span>}
+            {errors.duration && <span id="duration-error" className="mt-1 block text-sm text-red-600">{errors.duration}</span>}
           </div>
         </div>
       </section>

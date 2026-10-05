@@ -35,6 +35,7 @@ export default function MyRideCard({ ride, editable }: { ride: Ride; editable: b
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
         <Link
           href={`/rides/${ride.id}`}
+          aria-label={`View ride from ${ride.from} to ${ride.to}`}
           className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           View
@@ -43,11 +44,15 @@ export default function MyRideCard({ ride, editable }: { ride: Ride; editable: b
           <>
             <Link
               href={`/my-rides/${ride.id}/edit`}
+              aria-label={`Edit ride from ${ride.from} to ${ride.to}`}
               className="rounded-full border border-brand-600 px-4 py-2 text-sm font-semibold text-brand-600 hover:bg-brand-50"
             >
               Edit
             </Link>
-            <DeleteRideButton action={deleteRideAction.bind(null, ride.id)} />
+            <DeleteRideButton
+              action={deleteRideAction.bind(null, ride.id)}
+              label={`Delete ride from ${ride.from} to ${ride.to}`}
+            />
           </>
         )}
       </div>

@@ -13,17 +13,19 @@ type Props = {
   min?: number | string;
   max?: number | string;
   step?: number | string;
+  invalid?: boolean;
+  describedBy?: string;
 };
 
-export default function FormField({ label, name, error, ...inputProps }: Props) {
+export default function FormField({ label, name, error, invalid, describedBy, ...inputProps }: Props) {
   const errorId = `${name}-error`;
   return (
     <label className="block">
       <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
       <input
         name={name}
-        aria-invalid={error ? true : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-invalid={error || invalid ? true : undefined}
+        aria-describedby={describedBy ?? (error ? errorId : undefined)}
         className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
         {...inputProps}
       />
