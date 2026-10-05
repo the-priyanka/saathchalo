@@ -171,6 +171,7 @@ async function driverRideChecks() {
   const code = (error: { code?: string; message?: string } | null) => error?.code;
   const message = (error: { message?: string } | null) => error?.message ?? '';
 
+  let foreignDriverId: string | undefined;
   try {
     // Create, read back, update, and the seats rule.
     const created = await anon.from('rides').insert(goodRide(demoId)).select('id, seats_left, seats_total').single();
@@ -226,6 +227,9 @@ async function driverRideChecks() {
     const foreignDelete = await anon.from('rides').delete().eq('id', 'r1').select('id');
     check("user cannot delete someone else's ride", foreignDelete.error !== null || (foreignDelete.data ?? []).length === 0, foreignDelete.error ?? foreignDelete.data);
     check('demo ride r1 is untouched', (await getRide('r1'))?.pricePerSeat === 450);
+    foreignDriverId = (await getRide('r1'))?.driverId;
+    const forOther = foreignDriverId ? await anon.from('rides').insert(goodRide(foreignDriverId)) : null;
+    check('user cannot post a ride as someone else', forOther !== null && code(forOther.error) === '42501', forOther?.error);
 
     // Past rides are read only. The service role can create one because it skips the time rules.
     const past = await admin.from('rides').insert(goodRide(demoId, { departure_time: inHours(-48) })).select('id').single();
@@ -263,10 +267,13 @@ async function driverRideChecks() {
   } finally {
     // Always clean up everything this block created, even if a check crashed.
     await admin.from('rides').delete().eq('driver_id', demoId).eq('is_demo', false);
+    if (foreignDriverId) await admin.from('rides').delete().eq('driver_id', foreignDriverId).eq('is_demo', false);
   }
 }
 
 async function main() {
+  const reset = await admin.rpc('refresh_demo_rides');
+  check('refresh_demo_rides clears posts from the demo account before the checks', reset.error === null, reset.error?.message);
   await dataLayerChecks();
   await rlsChecks();
   await driverRideChecks();

@@ -59,7 +59,7 @@ This is a normal user with no extra privileges.
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests |
 | `npm run db:seed` | Seed demo drivers, demo rides, and the demo user (safe to re-run) |
-| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, demo refresh |
+| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, demo refresh. They assume only the demo rides exist: rides posted from the demo account are cleared automatically, so delete rides posted from other test accounts before running |
 
 ## How the data works
 
