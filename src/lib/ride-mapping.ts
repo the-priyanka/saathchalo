@@ -1,4 +1,4 @@
-import type { Driver, RideWithDriver } from './types';
+import type { Driver, Ride, RideWithDriver } from './types';
 
 export type ProfileRow = {
   id: string;
@@ -54,7 +54,7 @@ export function mapProfile(row: ProfileRow): Driver {
   };
 }
 
-export function mapRide(row: RideWithDriverRow): RideWithDriver {
+export function mapRideRow(row: RideRow): Ride {
   return {
     id: row.id,
     from: row.from_city,
@@ -74,6 +74,9 @@ export function mapRide(row: RideWithDriverRow): RideWithDriver {
       pets: row.pref_pets,
       luggage: row.pref_luggage,
     },
-    driver: mapProfile(row.driver),
   };
+}
+
+export function mapRide(row: RideWithDriverRow): RideWithDriver {
+  return { ...mapRideRow(row), driver: mapProfile(row.driver) };
 }

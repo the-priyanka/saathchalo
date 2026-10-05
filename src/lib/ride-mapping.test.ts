@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mapProfile, mapRide, toIstIso, type ProfileRow, type RideWithDriverRow } from '@/lib/ride-mapping';
+import { mapProfile, mapRide, mapRideRow, toIstIso, type ProfileRow, type RideWithDriverRow } from '@/lib/ride-mapping';
 
 const profile: ProfileRow = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -85,5 +85,27 @@ describe('mapRide', () => {
       preferences: { ac: true, music: true, pets: false, luggage: true },
     });
     expect(ride.driver.name).toBe('Rohan Mehta');
+  });
+});
+
+describe('mapRideRow', () => {
+  it('maps a ride row to a ride and never includes a joined driver', () => {
+    const ride = mapRideRow(row);
+    expect(ride).toEqual({
+      id: 'r1',
+      from: 'Delhi',
+      to: 'Chandigarh',
+      pickupPoint: 'Kashmere Gate ISBT',
+      dropPoint: 'Sector 17 ISBT',
+      departureTime: '2026-10-02T06:30:00+05:30',
+      durationMins: 300,
+      pricePerSeat: 450,
+      seatsLeft: 3,
+      seatsTotal: 4,
+      driverId: profile.id,
+      car: { model: 'Maruti Swift', color: 'White' },
+      preferences: { ac: true, music: true, pets: false, luggage: true },
+    });
+    expect('driver' in ride).toBe(false);
   });
 });
