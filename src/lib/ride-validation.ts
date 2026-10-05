@@ -1,4 +1,5 @@
 import type { Validation } from './auth-validation';
+import { CITIES } from './cities';
 import type { Ride } from './types';
 
 export type RideFormRaw = {
@@ -59,6 +60,9 @@ const DURATION_RANGE = 'Duration must be between 15 minutes and 24 hours, with m
 const PRICE_ERROR = 'Price per seat must be a whole number between ₹50 and ₹5,000.';
 const SEATS_ERROR = 'Seats must be a whole number between 1 and 6.';
 
+const canonicalCity = (city: string) =>
+  CITIES.find((known) => known.toLowerCase() === city.toLowerCase()) ?? city;
+
 const inRange = (value: number, min: number, max: number) => value >= min && value <= max;
 const lengthMessage = (label: string, min: number, max: number) =>
   `${label} must be ${min} to ${max} characters.`;
@@ -93,8 +97,8 @@ export function validateRideInput(
 ): Validation<RideInput, RideField> {
   const errors: Partial<Record<RideField, string>> = {};
 
-  const from = raw.fromCity.trim();
-  const to = raw.toCity.trim();
+  const from = canonicalCity(raw.fromCity.trim());
+  const to = canonicalCity(raw.toCity.trim());
   const pickupPoint = raw.pickupPoint.trim();
   const dropPoint = raw.dropPoint.trim();
   const carModel = raw.carModel.trim();

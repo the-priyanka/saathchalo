@@ -53,6 +53,17 @@ describe('validateRideInput', () => {
     });
   });
 
+  it('uses the canonical spelling for known cities', () => {
+    const result = validateRideInput({ ...valid, fromCity: 'delhi ', toCity: 'MYSURU' }, NOW);
+    expect(result.ok && result.value.from).toBe('Delhi');
+    expect(result.ok && result.value.to).toBe('Mysuru');
+  });
+
+  it('keeps an unknown city as typed', () => {
+    const result = validateRideInput({ ...valid, toCity: ' Agra ' }, NOW);
+    expect(result.ok && result.value.to).toBe('Agra');
+  });
+
   it('trims text fields', () => {
     const result = validateRideInput({ ...valid, fromCity: '  Delhi ', carModel: ' Swift  ' }, NOW);
     expect(result.ok && result.value.from).toBe('Delhi');
