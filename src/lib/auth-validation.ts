@@ -5,6 +5,7 @@ export type Validation<T, K extends string> =
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
 const MAX_BIO = 300;
+const MAX_NAME = 80;
 
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const EMAIL_ERROR = 'Enter a valid email address.';
@@ -20,6 +21,7 @@ export function validateSignup(input: { fullName: string; email: string; passwor
   const fullName = input.fullName.trim();
   const email = normalizeEmail(input.email);
   if (!fullName) errors.fullName = 'Enter your full name.';
+  else if (fullName.length > MAX_NAME) errors.fullName = `Name can be at most ${MAX_NAME} characters.`;
   if (!EMAIL_RE.test(email)) errors.email = EMAIL_ERROR;
   if (input.password.length < MIN_PASSWORD) errors.password = PASSWORD_ERROR;
   return finish(errors, { fullName, email, password: input.password });

@@ -23,7 +23,7 @@ begin
   insert into public.profiles (id, full_name)
   values (
     new.id,
-    coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'Traveller')
+    left(coalesce(nullif(trim(new.raw_user_meta_data ->> 'full_name'), ''), nullif(split_part(coalesce(new.email, ''), '@', 1), ''), 'Traveller'), 80)
   );
   return new;
 end;

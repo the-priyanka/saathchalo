@@ -29,6 +29,20 @@ describe('validateSignup', () => {
       },
     });
   });
+
+  it('accepts a name of exactly 80 characters and rejects 81', () => {
+    const base = { email: 'a@b.co', password: 'longenough' };
+    expect(validateSignup({ ...base, fullName: 'a'.repeat(80) }).ok).toBe(true);
+    expect(validateSignup({ ...base, fullName: 'a'.repeat(81) })).toEqual({
+      ok: false,
+      errors: { fullName: 'Name can be at most 80 characters.' },
+    });
+  });
+
+  it('counts the trimmed name against the 80 character limit', () => {
+    const result = validateSignup({ fullName: `  ${'a'.repeat(80)}  `, email: 'a@b.co', password: 'longenough' });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe('validateLogin', () => {
