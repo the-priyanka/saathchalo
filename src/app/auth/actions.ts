@@ -12,6 +12,8 @@ import {
   validateReset,
   validateSignup,
 } from '@/lib/auth-validation';
+import { validatePhone } from '@/lib/booking-validation';
+import { removePhone, savePhone } from '@/lib/contacts';
 import type { FormState } from '@/lib/form-state';
 import { safeNextPath } from '@/lib/safe-next';
 import { createClient } from '@/lib/supabase/server';
@@ -162,4 +164,25 @@ export async function updateBioAction(_prev: FormState, formData: FormData): Pro
   if (error) return { error: 'Could not save your bio. Please try again.' };
   revalidatePath('/account');
   return { message: 'Saved.' };
+}
+
+export async function updatePhoneAction(_prev: FormState, formData: FormData): Promise<FormState> {
+  const user = await getCurrentUser();
+  if (!user) redirect('/login?next=/account');
+
+  const raw = text(formData, 'phone');
+  const parsed = validatePhone(raw);
+  if (!parsed.ok) return { fieldErrors: parsed.errors, values: { phone: raw } };
+
+  try {
+    if (parsed.value === null) await removePhone(user.id);
+    else await savePhone(user.id, parsed.value);
+  } catch {
+    return { error: 'Could not save your phone number. Please try again.', values: { phone: raw } };
+  }
+  revalidatePath('/account');
+  return {
+    message: parsed.value === null ? 'Phone number removed.' : 'Saved.',
+    values: { phone: parsed.value ?? '' },
+  };
 }

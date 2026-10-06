@@ -7,6 +7,7 @@ import CancelRideButton from '@/components/bookings/CancelRideButton';
 import { getCurrentUser } from '@/lib/auth';
 import { bookingErrorMessage, isBookingErrorCode } from '@/lib/booking-errors';
 import { getBookingsForRide } from '@/lib/bookings';
+import { getPhones } from '@/lib/contacts';
 import { isRideUpcoming } from '@/lib/booking-status';
 import { getOwnedRide } from '@/lib/driver-rides';
 import { formatArrival, formatDate, formatINR, formatTime } from '@/lib/format';
@@ -43,6 +44,13 @@ export default async function ManageRidePage({
 
   const bookings = await getBookingsForRide(ride.id);
   const upcoming = isRideUpcoming(ride);
+  const accepted = bookings.filter((b) => b.status === 'accepted').map((b) => b.passenger.id);
+  let phones: Record<string, string> = {};
+  try {
+    phones = await getPhones([...new Set(accepted)]);
+  } catch {
+    phones = {};
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -80,7 +88,7 @@ export default async function ManageRidePage({
           <ul className="mt-3 space-y-4">
             {bookings.map((booking) => (
               <li key={booking.id}>
-                <BookingRequestRow booking={booking} ride={ride} upcoming={upcoming} />
+                <BookingRequestRow booking={booking} ride={ride} upcoming={upcoming} phone={phones[booking.passenger.id]} />
               </li>
             ))}
           </ul>

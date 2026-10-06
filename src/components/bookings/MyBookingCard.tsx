@@ -5,9 +5,12 @@ import { canPassengerCancel } from '@/lib/booking-status';
 import { formatArrival, formatDate, formatINR, formatTime } from '@/lib/format';
 import type { BookingWithRide } from '@/lib/types';
 import CancelBookingButton from './CancelBookingButton';
+import ContactPhone from './ContactPhone';
 import StatusBadge from './StatusBadge';
 
-export default function MyBookingCard({ booking, upcoming }: { booking: BookingWithRide; upcoming: boolean }) {
+type Props = { booking: BookingWithRide; upcoming: boolean; driverPhone?: string };
+
+export default function MyBookingCard({ booking, upcoming, driverPhone }: Props) {
   const { ride } = booking;
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
@@ -23,6 +26,7 @@ export default function MyBookingCard({ booking, upcoming }: { booking: BookingW
             {ride.from} to {ride.to}
           </p>
           <p className="text-sm text-slate-500">Driver: {ride.driver.name}</p>
+          {booking.status === 'accepted' && <ContactPhone label="Driver phone" phone={driverPhone} />}
         </div>
         <div className="text-right">
           <StatusBadge status={booking.status} />

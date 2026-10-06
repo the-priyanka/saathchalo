@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { cancelBookingAction, requestBookingAction } from '@/app/bookings/actions';
 import CancelBookingButton from '@/components/bookings/CancelBookingButton';
+import ContactPhone from '@/components/bookings/ContactPhone';
 import StatusBadge from '@/components/bookings/StatusBadge';
 import {
   BOOKING_STATUS_LABELS,
@@ -16,11 +17,12 @@ type Props = {
   ride: Ride;
   viewerId: string | null;
   myBooking: Booking | undefined;
+  driverPhone?: string;
 };
 
 const noticeClass = 'mt-5 rounded-lg bg-slate-50 p-3 text-sm text-slate-700';
 
-function Body({ ride, viewerId, myBooking }: Props) {
+function Body({ ride, viewerId, myBooking, driverPhone }: Props) {
   const upcoming = isRideUpcoming(ride);
   const active = myBooking && isActiveBookingStatus(myBooking.status) ? myBooking : undefined;
 
@@ -50,6 +52,7 @@ function Body({ ride, viewerId, myBooking }: Props) {
         <p className="text-sm text-slate-600">
           {active.seats} {active.seats === 1 ? 'seat' : 'seats'}, {formatINR(ride.pricePerSeat * active.seats)} in total.
         </p>
+        {active.status === 'accepted' && <ContactPhone label="Driver phone" phone={driverPhone} />}
         {canPassengerCancel(active.status, upcoming) && (
           <CancelBookingButton action={cancelBookingAction.bind(null, active.id)} />
         )}

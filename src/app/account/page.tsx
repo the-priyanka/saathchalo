@@ -1,8 +1,10 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import BioForm from '@/components/auth/BioForm';
+import PhoneForm from '@/components/auth/PhoneForm';
 import Avatar from '@/components/ui/Avatar';
 import { getCurrentUser } from '@/lib/auth';
+import { getMyPhone } from '@/lib/contacts';
 
 export const metadata: Metadata = { title: 'My account' };
 export const dynamic = 'force-dynamic';
@@ -10,6 +12,13 @@ export const dynamic = 'force-dynamic';
 export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login?next=/account');
+
+  let phone = '';
+  try {
+    phone = (await getMyPhone(user.id)) ?? '';
+  } catch {
+    phone = '';
+  }
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-12">
@@ -30,6 +39,13 @@ export default async function AccountPage() {
         <h2 className="text-lg font-semibold text-slate-900">About you</h2>
         <div className="mt-4">
           <BioForm bio={user.bio} />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-slate-900">Contact</h2>
+        <div className="mt-4">
+          <PhoneForm phone={phone} />
         </div>
       </section>
     </div>

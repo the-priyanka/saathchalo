@@ -3,11 +3,12 @@ import { canDriverAccept, canDriverRespond } from '@/lib/booking-status';
 import { formatDate } from '@/lib/format';
 import { toIstIso } from '@/lib/ride-mapping';
 import type { BookingWithPassenger, Ride } from '@/lib/types';
+import ContactPhone from './ContactPhone';
 import StatusBadge from './StatusBadge';
 
-type Props = { booking: BookingWithPassenger; ride: Ride; upcoming: boolean };
+type Props = { booking: BookingWithPassenger; ride: Ride; upcoming: boolean; phone?: string };
 
-export default function BookingRequestRow({ booking, ride, upcoming }: Props) {
+export default function BookingRequestRow({ booking, ride, upcoming, phone }: Props) {
   const canRespond = canDriverRespond(booking.status, upcoming);
   const canAccept = canDriverAccept(booking.status, upcoming, ride.seatsLeft, booking.seats);
 
@@ -19,6 +20,7 @@ export default function BookingRequestRow({ booking, ride, upcoming }: Props) {
           <p className="text-sm text-slate-600">
             {booking.seats} {booking.seats === 1 ? 'seat' : 'seats'}
           </p>
+          {booking.status === 'accepted' && <ContactPhone label="Phone" phone={phone} />}
           <p className="text-xs text-slate-500">Requested on {formatDate(toIstIso(booking.createdAt))}</p>
         </div>
         <StatusBadge status={booking.status} />

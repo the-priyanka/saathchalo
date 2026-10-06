@@ -5,6 +5,7 @@ import MyBookingCard from '@/components/bookings/MyBookingCard';
 import { getCurrentUser } from '@/lib/auth';
 import { bookingErrorMessage, isBookingErrorCode } from '@/lib/booking-errors';
 import { getMyBookings } from '@/lib/bookings';
+import { getPhones } from '@/lib/contacts';
 import { firstParam } from '@/lib/safe-next';
 
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,13 @@ export default async function MyBookingsPage({
   }
 
   const { upcoming, past } = await getMyBookings(user.id);
+  const driverIds = [...upcoming, ...past].filter((b) => b.status === 'accepted').map((b) => b.ride.driverId);
+  let phones: Record<string, string> = {};
+  try {
+    phones = await getPhones([...new Set(driverIds)]);
+  } catch {
+    phones = {};
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -57,7 +65,7 @@ export default async function MyBookingsPage({
           <ul className="mt-3 space-y-4">
             {upcoming.map((booking) => (
               <li key={booking.id}>
-                <MyBookingCard booking={booking} upcoming />
+                <MyBookingCard booking={booking} upcoming driverPhone={phones[booking.ride.driverId]} />
               </li>
             ))}
           </ul>
@@ -72,7 +80,7 @@ export default async function MyBookingsPage({
           <ul className="mt-3 space-y-4">
             {past.map((booking) => (
               <li key={booking.id}>
-                <MyBookingCard booking={booking} upcoming={false} />
+                <MyBookingCard booking={booking} upcoming={false} driverPhone={phones[booking.ride.driverId]} />
               </li>
             ))}
           </ul>
