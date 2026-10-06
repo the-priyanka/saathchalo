@@ -98,6 +98,7 @@ async function main() {
       duration_mins: ride.durationMins,
       price_per_seat: ride.pricePerSeat,
       seats_left: ride.seatsLeft,
+      demo_seats_left: ride.seatsLeft,
       seats_total: ride.seatsTotal,
       car_model: ride.car.model,
       car_color: ride.car.color,

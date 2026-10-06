@@ -23,9 +23,17 @@ SaathChalo is an intercity carpooling website for India, built as a portfolio an
 - Posts from the shared demo account are cleaned up every night
 - Run `supabase/migrations/0003_driver_rides.sql` once in the Supabase SQL editor after the first two migrations
 
-## Phase 2C (planned)
+## Phase 2C part 1 (done)
 
-- Passenger side: book a seat, my bookings, booking requests
+- Passengers can request seats on a ride, drivers accept or reject, and both sides can cancel
+- Seats stay correct through database functions (`request_booking`, `respond_booking`, `cancel_booking`, `cancel_ride`)
+- Demo rides confirm requests instantly and reset every night
+- `/my-bookings` for passengers and `/my-rides/[id]` for drivers (requests and Cancel ride)
+- Run `supabase/migrations/0004_bookings.sql` in the Supabase SQL editor after `0003`, then run `npm run db:seed` (it stores `demo_seats_left`)
+
+## Planned
+
+- Phone numbers
 
 ## Tech
 
