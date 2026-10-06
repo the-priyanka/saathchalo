@@ -14,3 +14,13 @@ export function validateSeatsRequest(raw: string, seatsLeft: number): Validation
 
   return { ok: true, value: seats };
 }
+
+const PHONE_ERROR = 'Enter a valid phone number: 10 to 15 digits, with an optional + at the start.';
+
+/** Strips spaces, dashes, and brackets. A blank input returns null, which means "remove my phone". */
+export function validatePhone(raw: string): Validation<string | null, 'phone'> {
+  const cleaned = raw.replace(/[\s\-()]/g, '');
+  if (cleaned === '') return { ok: true, value: null };
+  if (!/^\+?[0-9]{10,15}$/.test(cleaned)) return { ok: false, errors: { phone: PHONE_ERROR } };
+  return { ok: true, value: cleaned };
+}
