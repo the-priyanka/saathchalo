@@ -466,6 +466,71 @@ async function bookingChecks() {
   }
 }
 
+async function phoneChecks() {
+  const users: TestUser[] = [];
+  const code = (error: { code?: string } | null) => error?.code;
+  const phoneOf = async (client: typeof anon, userId: string) => {
+    const { data } = await client.from('profile_contacts').select('phone').eq('user_id', userId);
+    return (data ?? []).map((row) => row.phone as string);
+  };
+
+  try {
+    const driver = await createTestUser('check-phone-driver@saathchalo.test', 'Phone Driver');
+    users.push(driver);
+    const passenger = await createTestUser('check-phone-passenger@saathchalo.test', 'Phone Passenger');
+    users.push(passenger);
+    const outsider = await createTestUser('check-phone-outsider@saathchalo.test', 'Phone Outsider');
+    users.push(outsider);
+
+    // Writing.
+    const driverPhone = await driver.client.from('profile_contacts').insert({ user_id: driver.id, phone: '9876543210' });
+    check('a user can save their own phone', driverPhone.error === null, driverPhone.error);
+    const passengerPhone = await passenger.client.from('profile_contacts').insert({ user_id: passenger.id, phone: '+919876543211' });
+    check('a passenger can save their own phone', passengerPhone.error === null, passengerPhone.error);
+    const badPhone = await outsider.client.from('profile_contacts').insert({ user_id: outsider.id, phone: '123' });
+    check('the database rejects an invalid phone', code(badPhone.error) === '23514', badPhone.error);
+    const forOther = await outsider.client.from('profile_contacts').insert({ user_id: driver.id, phone: '9000000000' });
+    check("a user cannot save a phone for someone else", code(forOther.error) === '42501', forOther.error);
+    const signedOut = await createClient(url as string, anonKey as string, options).from('profile_contacts').select('phone');
+    check('a signed-out visitor cannot read phones', code(signedOut.error) === '42501', signedOut.error);
+    const outsiderPhone = await outsider.client.from('profile_contacts').insert({ user_id: outsider.id, phone: '9111111111' });
+    check('the outsider saves a valid phone', outsiderPhone.error === null, outsiderPhone.error);
+
+    check('a user can read their own phone', same(await phoneOf(driver.client, driver.id), ['9876543210']));
+
+    // Visibility before, during, and after a booking.
+    const ride = await admin.from('rides').insert(goodRide(driver.id, { seats_total: 3 })).select('id').single();
+    const rideId = ride.data?.id as string | undefined;
+    if (!rideId) {
+      check('service role can create a ride for the phone checks', false, ride.error);
+      return;
+    }
+    check('nobody sees the other phone before any booking', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    const booking = await passenger.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    const bookingId = booking.data as string;
+    check('a pending request does not reveal phones', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    await driver.client.rpc('respond_booking', { p_booking_id: bookingId, p_accept: true });
+    check('after acceptance the passenger sees the driver phone', same(await phoneOf(passenger.client, driver.id), ['9876543210']));
+    check('after acceptance the driver sees the passenger phone', same(await phoneOf(driver.client, passenger.id), ['+919876543211']));
+    check('a third user never sees either phone', (await phoneOf(outsider.client, driver.id)).length === 0 && (await phoneOf(outsider.client, passenger.id)).length === 0);
+
+    await passenger.client.rpc('cancel_booking', { p_booking_id: bookingId });
+    check('after cancelling, the phones are hidden again', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    // Owner changes only.
+    const changed = await passenger.client.from('profile_contacts').update({ phone: '+919000000001' }).eq('user_id', passenger.id).select('phone');
+    check('a user can change their own phone', changed.error === null && changed.data?.[0]?.phone === '+919000000001', changed.error);
+    const changeOther = await passenger.client.from('profile_contacts').update({ phone: '9000000002' }).eq('user_id', driver.id).select('phone');
+    check("a user cannot change someone else's phone", changeOther.error !== null || (changeOther.data ?? []).length === 0, changeOther.error ?? changeOther.data);
+    const removed = await passenger.client.from('profile_contacts').delete().eq('user_id', passenger.id).select('user_id');
+    check('a user can remove their own phone', removed.error === null && (removed.data ?? []).length === 1, removed.error);
+  } finally {
+    for (const user of users) await admin.auth.admin.deleteUser(user.id);
+  }
+}
+
 async function main() {
   const reset = await admin.rpc('refresh_demo_rides');
   check('refresh_demo_rides clears posts from the demo account before the checks', reset.error === null, reset.error?.message);
@@ -473,6 +538,7 @@ async function main() {
   await rlsChecks();
   await driverRideChecks();
   await bookingChecks();
+  await phoneChecks();
   await refreshCheck();
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);

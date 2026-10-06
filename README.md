@@ -31,9 +31,16 @@ SaathChalo is an intercity carpooling website for India, built as a portfolio an
 - `/my-bookings` for passengers and `/my-rides/[id]` for drivers (requests and Cancel ride)
 - Run `supabase/migrations/0004_bookings.sql` in the Supabase SQL editor after `0003`, then run `npm run db:seed` (it stores `demo_seats_left`)
 
-## Planned
+## Phase 2C part 2: Phone numbers (done)
 
-- Phone numbers
+- Users can add an optional phone number on the account page
+- A phone is shown only to the other person of an accepted booking, until 24 hours after departure
+- Run `supabase/migrations/0005_profile_contacts.sql` in the Supabase SQL editor after `0004`
+
+## Not planned
+
+- Payments
+- Notifications
 
 ## Tech
 
