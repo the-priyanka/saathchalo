@@ -44,5 +44,6 @@ create policy "owners remove their phone number"
 revoke all on public.profile_contacts from anon, authenticated;
 grant select, delete on public.profile_contacts to authenticated;
 grant insert (user_id, phone) on public.profile_contacts to authenticated;
-grant update (phone) on public.profile_contacts to authenticated;
+-- user_id is included because a PostgREST upsert on user_id sets it in ON CONFLICT DO UPDATE. The update policy check still stops anyone changing the owner.
+grant update (user_id, phone) on public.profile_contacts to authenticated;
 grant all on public.profile_contacts to service_role;
