@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { getDriver, getPopularRoutes, getRide, searchRides } from '@/lib/rides';
 import { DEMO_USER } from './demo-user';
@@ -285,12 +286,269 @@ async function driverRideChecks() {
   }
 }
 
+type TestUser = { id: string; email: string; client: typeof anon };
+
+async function findUserIdByEmail(email: string): Promise<string | undefined> {
+  const perPage = 200;
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    const hit = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (hit) return hit.id;
+    if (data.users.length < perPage) return undefined;
+  }
+  return undefined;
+}
+
+/** Creates a confirmed test user (replacing a leftover from a crashed run) and signs it in. */
+async function createTestUser(email: string, fullName: string): Promise<TestUser> {
+  const stale = await findUserIdByEmail(email);
+  if (stale) await admin.auth.admin.deleteUser(stale);
+  const password = randomUUID();
+  const created = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+  if (created.error || !created.data.user) throw created.error ?? new Error(`Could not create ${email}`);
+  const client = createClient(url as string, anonKey as string, options);
+  const signedIn = await client.auth.signInWithPassword({ email, password });
+  if (signedIn.error) throw signedIn.error;
+  return { id: created.data.user.id, email, client };
+}
+
+const seatsLeftOf = async (rideId: string) =>
+  (await admin.from('rides').select('seats_left').eq('id', rideId).single()).data?.seats_left;
+
+async function bookingChecks() {
+  const users: TestUser[] = [];
+  const message = (error: { message?: string } | null) => error?.message ?? '';
+  const code = (error: { code?: string } | null) => error?.code;
+
+  try {
+    const driver = await createTestUser('check-driver@saathchalo.test', 'Check Driver');
+    users.push(driver);
+    const passenger = await createTestUser('check-passenger@saathchalo.test', 'Check Passenger');
+    users.push(passenger);
+    const demo = anon; // signed in as the demo user by the earlier checks
+
+    const created = await admin
+      .from('rides')
+      .insert(goodRide(driver.id, { seats_total: 4 }))
+      .select('id')
+      .single();
+    const rideId = created.data?.id as string | undefined;
+    check('service role can create a ride for the booking checks', created.error === null && typeof rideId === 'string', created.error);
+    if (!rideId) return;
+    check('a new ride has all seats free', (await seatsLeftOf(rideId)) === 4);
+
+    // Requests.
+    const b1 = await passenger.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 2 });
+    check('passenger can request seats', b1.error === null && typeof b1.data === 'string', b1.error);
+    check('a pending request does not change seats_left', (await seatsLeftOf(rideId)) === 4);
+
+    const own = await driver.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    check('a driver cannot request their own ride', message(own.error).includes('own_ride'), own.error);
+    const dup = await passenger.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    check('a second active request on the same ride is rejected', message(dup.error).includes('booking_exists'), dup.error);
+    const tooMany = await demo.rpc('request_booking', { p_ride_id: rideId, p_seats: 5 });
+    check('requesting more seats than are left is rejected', message(tooMany.error).includes('not_enough_seats'), tooMany.error);
+    const zero = await demo.rpc('request_booking', { p_ride_id: rideId, p_seats: 0 });
+    check('requesting zero seats is rejected', message(zero.error).includes('not_enough_seats'), zero.error);
+    const unknownRide = await demo.rpc('request_booking', { p_ride_id: 'does-not-exist', p_seats: 1 });
+    check('requesting an unknown ride is rejected', message(unknownRide.error).includes('ride_not_bookable'), unknownRide.error);
+    const signedOut = await createClient(url as string, anonKey as string, options).rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    check('a signed-out visitor cannot call request_booking', code(signedOut.error) === '42501', signedOut.error);
+
+    const b2 = await demo.rpc('request_booking', { p_ride_id: rideId, p_seats: 3 });
+    check('a second passenger can request seats', b2.error === null && typeof b2.data === 'string', b2.error);
+    const b1Id = b1.data as string;
+    const b2Id = b2.data as string;
+
+    // Privacy and write protection.
+    const seenByPassenger = await passenger.client.from('bookings').select('id');
+    check('a passenger sees only their own bookings', same((seenByPassenger.data ?? []).map((b) => b.id), [b1Id]), seenByPassenger.data);
+    const seenByDriver = await driver.client.from('bookings').select('id').eq('ride_id', rideId);
+    check('the driver sees every booking on their ride', (seenByDriver.data ?? []).length === 2, seenByDriver.data);
+    const insertDirect = await passenger.client.from('bookings').insert({ ride_id: rideId, passenger_id: passenger.id, seats: 1 });
+    check('a client cannot insert into bookings', code(insertDirect.error) === '42501', insertDirect.error);
+    const updateDirect = await passenger.client.from('bookings').update({ status: 'accepted' }).eq('id', b1Id).select('id');
+    check('a client cannot update bookings', code(updateDirect.error) === '42501', updateDirect.error);
+    const deleteDirect = await passenger.client.from('bookings').delete().eq('id', b1Id).select('id');
+    check('a client cannot delete bookings', code(deleteDirect.error) === '42501', deleteDirect.error);
+
+    // Responses.
+    const wrongResponder = await demo.rpc('respond_booking', { p_booking_id: b1Id, p_accept: true });
+    check('only the driver can respond', message(wrongResponder.error).includes('not_allowed'), wrongResponder.error);
+    const wrongCanceller = await passenger.client.rpc('cancel_booking', { p_booking_id: b2Id });
+    check("a passenger cannot cancel someone else's booking", message(wrongCanceller.error).includes('not_allowed'), wrongCanceller.error);
+
+    const acceptB2 = await driver.client.rpc('respond_booking', { p_booking_id: b2Id, p_accept: true });
+    check('the driver can accept a request', acceptB2.error === null, acceptB2.error);
+    check('accepting reduces seats_left', (await seatsLeftOf(rideId)) === 1);
+    const acceptAgain = await driver.client.rpc('respond_booking', { p_booking_id: b2Id, p_accept: true });
+    check('a request cannot be answered twice', message(acceptAgain.error).includes('booking_not_pending'), acceptAgain.error);
+    const acceptTooMany = await driver.client.rpc('respond_booking', { p_booking_id: b1Id, p_accept: true });
+    check('accepting more seats than are left is rejected', message(acceptTooMany.error).includes('not_enough_seats'), acceptTooMany.error);
+    const reject = await driver.client.rpc('respond_booking', { p_booking_id: b1Id, p_accept: false });
+    check('the driver can reject a request', reject.error === null, reject.error);
+    check('a rejected request leaves seats alone', (await seatsLeftOf(rideId)) === 1);
+
+    // Cancel by the passenger.
+    const cancelB2 = await demo.rpc('cancel_booking', { p_booking_id: b2Id });
+    check('a passenger can cancel an accepted booking', cancelB2.error === null, cancelB2.error);
+    check('cancelling an accepted booking returns the seats', (await seatsLeftOf(rideId)) === 4);
+    const cancelAgain = await demo.rpc('cancel_booking', { p_booking_id: b2Id });
+    check('a cancelled booking cannot be cancelled again', message(cancelAgain.error).includes('booking_not_active'), cancelAgain.error);
+
+    // A rejected request frees the passenger to ask again.
+    const b3 = await passenger.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 2 });
+    check('a passenger can request again after a rejection', b3.error === null && typeof b3.data === 'string', b3.error);
+    const b3Id = b3.data as string;
+
+    // Edit lock and seat floor while a booking is active.
+    const moveTime = await driver.client.from('rides').update({ departure_time: inHours(72) }).eq('id', rideId).select('id');
+    check('the departure of a ride with bookings is locked', message(moveTime.error).includes('ride_locked'), moveTime.error ?? moveTime.data);
+    const moveRoute = await driver.client.from('rides').update({ from_city: 'Agra' }).eq('id', rideId).select('id');
+    check('the route of a ride with bookings is locked', message(moveRoute.error).includes('ride_locked'), moveRoute.error ?? moveRoute.data);
+    const price = await driver.client.from('rides').update({ price_per_seat: 600 }).eq('id', rideId).select('price_per_seat');
+    check('the price of a ride with bookings can still change', price.error === null && price.data?.[0]?.price_per_seat === 600, price.error);
+    const acceptB3 = await driver.client.rpc('respond_booking', { p_booking_id: b3Id, p_accept: true });
+    check('the driver accepts the new request', acceptB3.error === null && (await seatsLeftOf(rideId)) === 2, acceptB3.error);
+    const belowBooked = await driver.client.from('rides').update({ seats_total: 1 }).eq('id', rideId).select('id');
+    check('seats cannot drop below the booked seats', message(belowBooked.error).includes('seats_below_booked'), belowBooked.error ?? belowBooked.data);
+    const moreSeats = await driver.client.from('rides').update({ seats_total: 6 }).eq('id', rideId).select('seats_left, seats_total');
+    check('raising seats keeps seats_left consistent', moreSeats.data?.[0]?.seats_left === 4 && moreSeats.data?.[0]?.seats_total === 6, moreSeats.error ?? moreSeats.data);
+
+    // Delete is blocked once a ride had bookings.
+    const deleteWithBookings = await driver.client.from('rides').delete().eq('id', rideId).select('id');
+    const stillThere = await admin.from('rides').select('id').eq('id', rideId);
+    check('a ride with bookings cannot be deleted', (deleteWithBookings.data ?? []).length === 0 && (stillThere.data ?? []).length === 1, deleteWithBookings.error ?? deleteWithBookings.data);
+
+    // Cancel ride.
+    const wrongRideCanceller = await passenger.client.rpc('cancel_ride', { p_ride_id: rideId });
+    check('only the driver can cancel a ride', message(wrongRideCanceller.error).includes('not_allowed'), wrongRideCanceller.error);
+    const cancelRide = await driver.client.rpc('cancel_ride', { p_ride_id: rideId });
+    check('the driver can cancel a ride', cancelRide.error === null, cancelRide.error);
+    const afterCancel = await admin.from('bookings').select('status').eq('id', b3Id).single();
+    check('cancelling a ride cancels its active bookings', afterCancel.data?.status === 'cancelled_by_driver', afterCancel.data);
+    const rideStatus = await admin.from('rides').select('status').eq('id', rideId).single();
+    check('a cancelled ride has the cancelled status', rideStatus.data?.status === 'cancelled', rideStatus.data);
+    check('a cancelled ride is hidden from search', !ids(await searchRides({ from: 'Delhi', to: 'Jaipur' })).includes(rideId));
+    const cancelTwice = await driver.client.rpc('cancel_ride', { p_ride_id: rideId });
+    check('a cancelled ride cannot be cancelled again', message(cancelTwice.error).includes('ride_not_bookable'), cancelTwice.error);
+    const requestCancelled = await demo.rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    check('a cancelled ride cannot be booked', message(requestCancelled.error).includes('ride_not_bookable'), requestCancelled.error);
+
+    // Past rides cannot be booked.
+    const past = await admin.from('rides').insert(goodRide(driver.id, { departure_time: inHours(-48) })).select('id').single();
+    const pastRequest = await passenger.client.rpc('request_booking', { p_ride_id: past.data?.id as string, p_seats: 1 });
+    check('a ride that has left cannot be booked', message(pastRequest.error).includes('ride_not_bookable'), pastRequest.error);
+
+    // Demo rides confirm instantly and reset every night.
+    const before = await seatsLeftOf('r1');
+    const demoBooking = await passenger.client.rpc('request_booking', { p_ride_id: 'r1', p_seats: 1 });
+    const demoStatus = await admin.from('bookings').select('status').eq('id', demoBooking.data as string).single();
+    check('a request on a demo ride is accepted at once', demoBooking.error === null && demoStatus.data?.status === 'accepted', demoBooking.error ?? demoStatus.data);
+    check('a demo booking reduces its seats', (await seatsLeftOf('r1')) === (before ?? 0) - 1);
+    const demoCancel = await passenger.client.rpc('cancel_booking', { p_booking_id: demoBooking.data as string });
+    check('a demo booking can be cancelled and returns its seat', demoCancel.error === null && (await seatsLeftOf('r1')) === before);
+    await passenger.client.rpc('request_booking', { p_ride_id: 'r1', p_seats: 1 });
+    await admin.rpc('refresh_demo_rides');
+    const leftover = await admin.from('bookings').select('id').eq('ride_id', 'r1');
+    check('the nightly refresh clears bookings on demo rides', (leftover.data ?? []).length === 0, leftover.data);
+    check('the nightly refresh restores demo seats', (await seatsLeftOf('r1')) === before);
+  } finally {
+    // Deleting the test users removes their profiles, rides, and bookings (cascade), even if a check crashed.
+    for (const user of users) await admin.auth.admin.deleteUser(user.id);
+    await admin.rpc('refresh_demo_rides');
+  }
+}
+
+async function phoneChecks() {
+  const users: TestUser[] = [];
+  const code = (error: { code?: string } | null) => error?.code;
+  const phoneOf = async (client: typeof anon, userId: string) => {
+    const { data } = await client.from('profile_contacts').select('phone').eq('user_id', userId);
+    return (data ?? []).map((row) => row.phone as string);
+  };
+
+  try {
+    const driver = await createTestUser('check-phone-driver@saathchalo.test', 'Phone Driver');
+    users.push(driver);
+    const passenger = await createTestUser('check-phone-passenger@saathchalo.test', 'Phone Passenger');
+    users.push(passenger);
+    const outsider = await createTestUser('check-phone-outsider@saathchalo.test', 'Phone Outsider');
+    users.push(outsider);
+
+    // Writing.
+    const driverPhone = await driver.client.from('profile_contacts').insert({ user_id: driver.id, phone: '9876543210' });
+    check('a user can save their own phone', driverPhone.error === null, driverPhone.error);
+    const passengerPhone = await passenger.client.from('profile_contacts').insert({ user_id: passenger.id, phone: '+919876543211' });
+    check('a passenger can save their own phone', passengerPhone.error === null, passengerPhone.error);
+    const badPhone = await outsider.client.from('profile_contacts').insert({ user_id: outsider.id, phone: '123' });
+    check('the database rejects an invalid phone', code(badPhone.error) === '23514', badPhone.error);
+    const forOther = await outsider.client.from('profile_contacts').insert({ user_id: driver.id, phone: '9000000000' });
+    check("a user cannot save a phone for someone else", code(forOther.error) === '42501', forOther.error);
+    const signedOut = await createClient(url as string, anonKey as string, options).from('profile_contacts').select('phone');
+    check('a signed-out visitor cannot read phones', code(signedOut.error) === '42501', signedOut.error);
+    const outsiderPhone = await outsider.client.from('profile_contacts').insert({ user_id: outsider.id, phone: '9111111111' });
+    check('the outsider saves a valid phone', outsiderPhone.error === null, outsiderPhone.error);
+
+    const demoClient = createClient(url as string, anonKey as string, options);
+    const demoSignIn = await demoClient.auth.signInWithPassword({ email: DEMO_USER.email, password: DEMO_USER.password });
+    const demoId = demoSignIn.data.user?.id;
+    if (demoId) {
+      const demoPhone = await demoClient.from('profile_contacts').insert({ user_id: demoId, phone: '9222222222' });
+      check('the shared demo account cannot save a phone', code(demoPhone.error) === '42501', demoPhone.error);
+    } else {
+      check('demo user can sign in for the phone checks', false, demoSignIn.error?.message);
+    }
+
+    check('a user can read their own phone', same(await phoneOf(driver.client, driver.id), ['9876543210']));
+
+    // Visibility before, during, and after a booking.
+    const ride = await admin.from('rides').insert(goodRide(driver.id, { seats_total: 3 })).select('id').single();
+    const rideId = ride.data?.id as string | undefined;
+    if (!rideId) {
+      check('service role can create a ride for the phone checks', false, ride.error);
+      return;
+    }
+    check('nobody sees the other phone before any booking', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    const booking = await passenger.client.rpc('request_booking', { p_ride_id: rideId, p_seats: 1 });
+    const bookingId = booking.data as string;
+    check('a pending request does not reveal phones', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    await driver.client.rpc('respond_booking', { p_booking_id: bookingId, p_accept: true });
+    check('after acceptance the passenger sees the driver phone', same(await phoneOf(passenger.client, driver.id), ['9876543210']));
+    check('after acceptance the driver sees the passenger phone', same(await phoneOf(driver.client, passenger.id), ['+919876543211']));
+    check('a third user never sees either phone', (await phoneOf(outsider.client, driver.id)).length === 0 && (await phoneOf(outsider.client, passenger.id)).length === 0);
+
+    await passenger.client.rpc('cancel_booking', { p_booking_id: bookingId });
+    check('after cancelling, the phones are hidden again', (await phoneOf(passenger.client, driver.id)).length === 0 && (await phoneOf(driver.client, passenger.id)).length === 0);
+
+    // Owner changes only.
+    const changed = await passenger.client.from('profile_contacts').update({ phone: '+919000000001' }).eq('user_id', passenger.id).select('phone');
+    check('a user can change their own phone', changed.error === null && changed.data?.[0]?.phone === '+919000000001', changed.error);
+    const changeOther = await passenger.client.from('profile_contacts').update({ phone: '9000000002' }).eq('user_id', driver.id).select('phone');
+    check("a user cannot change someone else's phone", changeOther.error !== null || (changeOther.data ?? []).length === 0, changeOther.error ?? changeOther.data);
+    const removed = await passenger.client.from('profile_contacts').delete().eq('user_id', passenger.id).select('user_id');
+    check('a user can remove their own phone', removed.error === null && (removed.data ?? []).length === 1, removed.error);
+  } finally {
+    for (const user of users) await admin.auth.admin.deleteUser(user.id);
+  }
+}
+
 async function main() {
   const reset = await admin.rpc('refresh_demo_rides');
   check('refresh_demo_rides clears posts from the demo account before the checks', reset.error === null, reset.error?.message);
   await dataLayerChecks();
   await rlsChecks();
   await driverRideChecks();
+  await bookingChecks();
+  await phoneChecks();
   await refreshCheck();
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
   process.exit(failures === 0 ? 0 : 1);

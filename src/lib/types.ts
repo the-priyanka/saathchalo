@@ -9,6 +9,8 @@ export type Driver = {
   bio: string;
 };
 
+export type RideStatus = 'active' | 'cancelled';
+
 export type Ride = {
   id: string;
   from: string;
@@ -23,6 +25,7 @@ export type Ride = {
   seatsLeft: number;
   seatsTotal: number;
   driverId: string;
+  status: RideStatus;
   car: { model: string; color: string };
   preferences: { ac: boolean; music: boolean; pets: boolean; luggage: boolean };
 };
@@ -54,3 +57,19 @@ export type PopularRoute = {
   startingPrice: number;
   rideCount: number;
 };
+
+export type BookingStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled' | 'cancelled_by_driver';
+
+export type Booking = {
+  id: string;
+  rideId: string;
+  passengerId: string;
+  seats: number;
+  status: BookingStatus;
+  /** ISO instant in UTC */
+  createdAt: string;
+};
+
+export type BookingWithRide = Booking & { ride: RideWithDriver };
+
+export type BookingWithPassenger = Booking & { passenger: { id: string; name: string } };

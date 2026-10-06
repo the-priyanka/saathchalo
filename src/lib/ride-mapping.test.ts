@@ -30,6 +30,7 @@ const row: RideWithDriverRow = {
   pref_music: true,
   pref_pets: false,
   pref_luggage: true,
+  status: 'active',
   driver: profile,
 };
 
@@ -103,9 +104,14 @@ describe('mapRideRow', () => {
       seatsLeft: 3,
       seatsTotal: 4,
       driverId: profile.id,
+      status: 'active',
       car: { model: 'Maruti Swift', color: 'White' },
       preferences: { ac: true, music: true, pets: false, luggage: true },
     });
     expect('driver' in ride).toBe(false);
+  });
+
+  it('maps a cancelled ride', () => {
+    expect(mapRideRow({ ...row, status: 'cancelled' }).status).toBe('cancelled');
   });
 });

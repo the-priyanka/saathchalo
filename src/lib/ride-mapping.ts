@@ -29,6 +29,7 @@ export type RideRow = {
   pref_music: boolean;
   pref_pets: boolean;
   pref_luggage: boolean;
+  status: 'active' | 'cancelled';
 };
 
 export type RideWithDriverRow = RideRow & { driver: ProfileRow };
@@ -67,6 +68,7 @@ export function mapRideRow(row: RideRow): Ride {
     seatsLeft: row.seats_left,
     seatsTotal: row.seats_total,
     driverId: row.driver_id,
+    status: row.status,
     car: { model: row.car_model, color: row.car_color },
     preferences: {
       ac: row.pref_ac,

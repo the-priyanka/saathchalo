@@ -49,6 +49,9 @@ export default function Navbar({ user }: Props) {
               <Link href="/my-rides" className="text-sm font-medium text-slate-700 hover:text-brand-600">
                 My rides
               </Link>
+              <Link href="/my-bookings" className="text-sm font-medium text-slate-700 hover:text-brand-600">
+                My bookings
+              </Link>
               <Link href="/account" className="text-sm font-medium text-slate-700 hover:text-brand-600">
                 Hi, {firstName}
               </Link>
@@ -104,6 +107,15 @@ export default function Navbar({ user }: Props) {
                     className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
                   >
                     My rides
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/my-bookings"
+                    onClick={() => setOpen(false)}
+                    className="block rounded-md px-3 py-2 font-medium text-slate-700 hover:bg-brand-50"
+                  >
+                    My bookings
                   </Link>
                 </li>
                 <li>

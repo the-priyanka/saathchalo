@@ -43,6 +43,7 @@ export async function searchRides(
   let request = supabase
     .from('rides')
     .select(RIDE_SELECT)
+    .eq('status', 'active')
     .gt('departure_time', new Date().toISOString());
 
   const from = query.from?.trim();
@@ -87,6 +88,7 @@ export async function getPopularRoutes(): Promise<PopularRoute[]> {
   const { data, error } = await supabase
     .from('rides')
     .select('from_city, to_city, price_per_seat')
+    .eq('status', 'active')
     .gt('departure_time', new Date().toISOString());
   if (error) throw new RidesUnavailableError(error.message);
 

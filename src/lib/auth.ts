@@ -2,6 +2,9 @@ import { cache } from 'react';
 import { hasSupabaseEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase/server';
 
+/** The shared demo account (public password). It cannot store or read phone numbers. */
+export const DEMO_EMAIL = 'demo@saathchalo.test';
+
 export type CurrentUser = {
   id: string;
   email: string;
