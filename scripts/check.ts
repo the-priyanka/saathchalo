@@ -496,6 +496,16 @@ async function phoneChecks() {
     const outsiderPhone = await outsider.client.from('profile_contacts').insert({ user_id: outsider.id, phone: '9111111111' });
     check('the outsider saves a valid phone', outsiderPhone.error === null, outsiderPhone.error);
 
+    const demoClient = createClient(url as string, anonKey as string, options);
+    const demoSignIn = await demoClient.auth.signInWithPassword({ email: DEMO_USER.email, password: DEMO_USER.password });
+    const demoId = demoSignIn.data.user?.id;
+    if (demoId) {
+      const demoPhone = await demoClient.from('profile_contacts').insert({ user_id: demoId, phone: '9222222222' });
+      check('the shared demo account cannot save a phone', code(demoPhone.error) === '42501', demoPhone.error);
+    } else {
+      check('demo user can sign in for the phone checks', false, demoSignIn.error?.message);
+    }
+
     check('a user can read their own phone', same(await phoneOf(driver.client, driver.id), ['9876543210']));
 
     // Visibility before, during, and after a booking.

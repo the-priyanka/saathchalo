@@ -6,35 +6,39 @@ create table public.profile_contacts (
 
 alter table public.profile_contacts enable row level security;
 
+-- The shared demo account has a public password, so it must never read or store phones: otherwise any visitor could read a real passenger's phone or plant one.
 -- The owner, or the other side of an accepted booking until 24 hours after departure.
 create policy "owners and accepted booking partners read phone numbers"
   on public.profile_contacts for select
   to authenticated
   using (
     user_id = (select auth.uid())
-    or exists (
-      select 1
-      from public.bookings b
-      join public.rides r on r.id = b.ride_id
-      where b.status = 'accepted'
-        and r.departure_time > now() - interval '24 hours'
-        and (
-          (b.passenger_id = (select auth.uid()) and r.driver_id = profile_contacts.user_id)
-          or (r.driver_id = (select auth.uid()) and b.passenger_id = profile_contacts.user_id)
-        )
+    or (
+      (select auth.jwt() ->> 'email') is distinct from 'demo@saathchalo.test'
+      and exists (
+        select 1
+        from public.bookings b
+        join public.rides r on r.id = b.ride_id
+        where b.status = 'accepted'
+          and r.departure_time > now() - interval '24 hours'
+          and (
+            (b.passenger_id = (select auth.uid()) and r.driver_id = profile_contacts.user_id)
+            or (r.driver_id = (select auth.uid()) and b.passenger_id = profile_contacts.user_id)
+          )
+      )
     )
   );
 
 create policy "owners add their phone number"
   on public.profile_contacts for insert
   to authenticated
-  with check (user_id = (select auth.uid()));
+  with check (user_id = (select auth.uid()) and (select auth.jwt() ->> 'email') is distinct from 'demo@saathchalo.test');
 
 create policy "owners change their phone number"
   on public.profile_contacts for update
   to authenticated
-  using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()));
+  using (user_id = (select auth.uid()) and (select auth.jwt() ->> 'email') is distinct from 'demo@saathchalo.test')
+  with check (user_id = (select auth.uid()) and (select auth.jwt() ->> 'email') is distinct from 'demo@saathchalo.test');
 
 create policy "owners remove their phone number"
   on public.profile_contacts for delete

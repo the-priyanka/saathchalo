@@ -35,6 +35,7 @@ SaathChalo is an intercity carpooling website for India, built as a portfolio an
 
 - Users can add an optional phone number on the account page
 - A phone is shown only to the other person of an accepted booking, until 24 hours after departure
+- Phone numbers are not available on the shared demo account
 - Run `supabase/migrations/0005_profile_contacts.sql` in the Supabase SQL editor after `0004`
 
 ## Not planned
@@ -74,7 +75,7 @@ This is a normal user with no extra privileges.
 | `npm run lint` | Run ESLint |
 | `npm test` | Run unit tests |
 | `npm run db:seed` | Seed demo drivers, demo rides, and the demo user (safe to re-run) |
-| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, driver rides, demo refresh |
+| `npm run db:check` | Live checks against your Supabase project: data layer, security rules, driver rides, bookings, phone visibility, demo refresh |
 
 The checks assume only the demo rides exist. Rides posted from the demo account are cleared automatically, so delete rides posted from other test accounts before running them.
 

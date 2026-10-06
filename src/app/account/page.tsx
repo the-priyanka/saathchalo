@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import BioForm from '@/components/auth/BioForm';
 import PhoneForm from '@/components/auth/PhoneForm';
 import Avatar from '@/components/ui/Avatar';
-import { getCurrentUser } from '@/lib/auth';
+import { DEMO_EMAIL, getCurrentUser } from '@/lib/auth';
 import { getMyPhone } from '@/lib/contacts';
 
 export const metadata: Metadata = { title: 'My account' };
@@ -45,7 +45,11 @@ export default async function AccountPage() {
       <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-slate-900">Contact</h2>
         <div className="mt-4">
-          <PhoneForm phone={phone} />
+          {user.email.toLowerCase() === DEMO_EMAIL ? (
+            <p className="text-sm text-slate-600">Phone numbers are not available on the shared demo account.</p>
+          ) : (
+            <PhoneForm phone={phone} />
+          )}
         </div>
       </section>
     </div>

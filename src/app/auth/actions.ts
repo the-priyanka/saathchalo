@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
-import { getCurrentUser } from '@/lib/auth';
+import { DEMO_EMAIL, getCurrentUser } from '@/lib/auth';
 import { authErrorMessage } from '@/lib/auth-errors';
 import {
   validateBio,
@@ -169,6 +169,10 @@ export async function updateBioAction(_prev: FormState, formData: FormData): Pro
 export async function updatePhoneAction(_prev: FormState, formData: FormData): Promise<FormState> {
   const user = await getCurrentUser();
   if (!user) redirect('/login?next=/account');
+
+  if (user.email.toLowerCase() === DEMO_EMAIL) {
+    return { error: 'Phone numbers are not available on the shared demo account.' };
+  }
 
   const raw = text(formData, 'phone');
   const parsed = validatePhone(raw);
