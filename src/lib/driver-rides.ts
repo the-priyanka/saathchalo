@@ -37,10 +37,11 @@ export async function getMyRides(userId: string): Promise<{ upcoming: Ride[]; pa
     ride: mapRideRow(row),
     time: Date.parse(row.departure_time),
   }));
+  const isUpcoming = (r: { ride: Ride; time: number }) => r.time > now && r.ride.status === 'active';
   return {
-    upcoming: rides.filter((r) => r.time > now).map((r) => r.ride),
+    upcoming: rides.filter(isUpcoming).map((r) => r.ride),
     past: rides
-      .filter((r) => r.time <= now)
+      .filter((r) => !isUpcoming(r))
       .reverse()
       .map((r) => r.ride),
   };
@@ -53,6 +54,7 @@ export async function getMyRide(id: string, userId: string): Promise<Ride | unde
     .select('*')
     .eq('id', id)
     .eq('driver_id', userId)
+    .eq('status', 'active')
     .gt('departure_time', new Date().toISOString())
     .maybeSingle();
   if (error) throw mapWriteError(error);
@@ -93,4 +95,17 @@ export async function deleteRide(id: string, userId: string): Promise<void> {
     .select('id');
   if (error) throw mapWriteError(error);
   if (!data || data.length === 0) throw new RideWriteError('not_found');
+}
+
+/** A ride the user owns, whatever its status or time. Used by the manage page. */
+export async function getOwnedRide(id: string, userId: string): Promise<Ride | undefined> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('rides')
+    .select('*')
+    .eq('id', id)
+    .eq('driver_id', userId)
+    .maybeSingle();
+  if (error) throw mapWriteError(error);
+  return data ? mapRideRow(data as unknown as RideRow) : undefined;
 }
