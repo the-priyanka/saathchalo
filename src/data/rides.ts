@@ -1,6 +1,6 @@
 import type { Ride } from '@/lib/types';
 
-export type RideTemplate = Omit<Ride, 'departureTime'> & {
+export type RideTemplate = Omit<Ride, 'departureTime' | 'status'> & {
   /** Days after today (IST). Must be between 1 and 14. */
   dayOffset: number;
   /** HH:MM, 24 hour, IST */
@@ -104,6 +104,6 @@ export function buildRides(now: Date): Ride[] {
 
   return rideTemplates.map(({ dayOffset, time, ...ride }) => {
     const date = new Date(todayUtcMidnight + dayOffset * DAY_MS).toISOString().slice(0, 10);
-    return { ...ride, departureTime: `${date}T${time}:00+05:30` };
+    return { ...ride, status: 'active' as const, departureTime: `${date}T${time}:00+05:30` };
   });
 }

@@ -264,6 +264,7 @@ describe('rideToFormValues', () => {
     seatsLeft: 3,
     seatsTotal: 3,
     driverId: 'd',
+    status: 'active',
     car: { model: 'Maruti Swift', color: 'White' },
     preferences: { ac: true, music: false, pets: false, luggage: true },
   };
