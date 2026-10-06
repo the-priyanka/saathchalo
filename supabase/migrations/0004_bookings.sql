@@ -5,6 +5,8 @@ alter table public.rides
   add column status text not null default 'active' check (status in ('active', 'cancelled')),
   add column demo_seats_left integer check (demo_seats_left >= 0);
 
+update public.rides set demo_seats_left = seats_left where is_demo;
+
 -- Bookings. Clients can only read them. Every change goes through the functions below.
 create table public.bookings (
   id uuid primary key default gen_random_uuid(),
@@ -53,6 +55,27 @@ create policy "drivers delete their own upcoming rides"
     and departure_time > now()
     and not exists (select 1 from public.bookings b where b.ride_id = rides.id)
   );
+
+-- The delete policy reads bookings with the statement's snapshot. This trigger runs after the row lock and sees a booking committed meanwhile.
+create function public.rides_block_booked_delete()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  if current_user in ('anon', 'authenticated')
+     and exists (select 1 from public.bookings b where b.ride_id = old.id) then
+    raise exception 'ride_locked';
+  end if;
+  return old;
+end;
+$$;
+
+create trigger rides_block_booked_delete_trg
+  before delete on public.rides
+  for each row
+  when (not old.is_demo)
+  execute function public.rides_block_booked_delete();
 
 -- Replaces the Phase 2B trigger function: seats_left now follows bookings, and booked rides are locked.
 create or replace function public.rides_enforce_rules()
@@ -191,6 +214,9 @@ begin
 
   -- Read the booking again now that the ride is locked.
   select * into b from public.bookings where id = p_booking_id for update;
+  if not found then
+    raise exception 'not_allowed';
+  end if;
   if b.status <> 'pending' then
     raise exception 'booking_not_pending';
   end if;
@@ -233,7 +259,7 @@ begin
 
   select * into r from public.rides where id = b.ride_id for update;
   select * into b from public.bookings where id = p_booking_id for update;
-  if b.status not in ('pending', 'accepted') then
+  if not found or b.status not in ('pending', 'accepted') then
     raise exception 'booking_not_active';
   end if;
   if r.departure_time <= now() then
