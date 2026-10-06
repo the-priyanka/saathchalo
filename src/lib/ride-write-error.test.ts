@@ -35,3 +35,17 @@ describe('rideWriteMessage', () => {
     expect(rideWriteMessage('unknown')).toBe('Could not save the ride. Please try again.');
   });
 });
+
+describe('booking related ride write errors', () => {
+  it('maps the edit lock and the seat floor', () => {
+    expect(mapWriteError({ message: 'ride_locked', code: 'P0001' }).code).toBe('ride_locked');
+    expect(mapWriteError({ message: 'seats_below_booked', code: 'P0001' }).code).toBe('seats_below_booked');
+  });
+
+  it('has friendly sentences for them', () => {
+    expect(rideWriteMessage('ride_locked')).toBe(
+      'This ride has bookings, so its route and time cannot be changed. Cancel the ride and post a new one instead.',
+    );
+    expect(rideWriteMessage('seats_below_booked')).toBe('You cannot offer fewer seats than are already booked.');
+  });
+});
