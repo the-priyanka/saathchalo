@@ -1,11 +1,22 @@
 import { ArrowRight } from 'lucide-react';
 import Link from 'next/link';
+import { cancelRideAction } from '@/app/bookings/actions';
 import { deleteRideAction } from '@/app/rides/actions';
+import CancelRideButton from '@/components/bookings/CancelRideButton';
 import { formatArrival, formatDate, formatDuration, formatINR, formatTime } from '@/lib/format';
+import type { BookingCounts } from '@/lib/bookings';
 import type { Ride } from '@/lib/types';
 import DeleteRideButton from './DeleteRideButton';
 
-export default function MyRideCard({ ride, editable }: { ride: Ride; editable: boolean }) {
+export default function MyRideCard({
+  ride,
+  editable,
+  counts,
+}: {
+  ride: Ride;
+  editable: boolean;
+  counts?: BookingCounts;
+}) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-4">
@@ -19,6 +30,11 @@ export default function MyRideCard({ ride, editable }: { ride: Ride; editable: b
           <p className="mt-1 text-slate-700">
             {ride.from} to {ride.to}
           </p>
+          {ride.status === 'cancelled' && (
+            <span className="mt-2 inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              Cancelled
+            </span>
+          )}
           <p className="text-sm text-slate-500">
             {formatDuration(ride.durationMins)} · {ride.car.color} {ride.car.model}
           </p>
@@ -40,6 +56,15 @@ export default function MyRideCard({ ride, editable }: { ride: Ride; editable: b
         >
           View
         </Link>
+        {counts && counts.total > 0 && (
+          <Link
+            href={`/my-rides/${ride.id}`}
+            aria-label={`Requests for ride from ${ride.from} to ${ride.to}`}
+            className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            Requests{counts.pending > 0 ? ` (${counts.pending} pending)` : ''}
+          </Link>
+        )}
         {editable && (
           <>
             <Link
@@ -49,10 +74,17 @@ export default function MyRideCard({ ride, editable }: { ride: Ride; editable: b
             >
               Edit
             </Link>
-            <DeleteRideButton
-              action={deleteRideAction.bind(null, ride.id)}
-              label={`Delete ride from ${ride.from} to ${ride.to}`}
-            />
+            {counts && counts.total > 0 ? (
+              <CancelRideButton
+                action={cancelRideAction.bind(null, ride.id)}
+                label={`Cancel ride from ${ride.from} to ${ride.to}`}
+              />
+            ) : (
+              <DeleteRideButton
+                action={deleteRideAction.bind(null, ride.id)}
+                label={`Delete ride from ${ride.from} to ${ride.to}`}
+              />
+            )}
           </>
         )}
       </div>

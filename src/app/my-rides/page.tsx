@@ -3,6 +3,8 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import MyRideCard from '@/components/rides/MyRideCard';
 import { getCurrentUser } from '@/lib/auth';
+import { bookingErrorMessage, isBookingErrorCode } from '@/lib/booking-errors';
+import { getBookingCounts, type BookingCounts } from '@/lib/bookings';
 import { getMyRides } from '@/lib/driver-rides';
 import { firstParam } from '@/lib/safe-next';
 
@@ -13,7 +15,6 @@ const NOTICES: Record<string, { text: string; tone: 'ok' | 'error' }> = {
   posted: { text: 'Your ride is posted and visible in search.', tone: 'ok' },
   updated: { text: 'Your ride was updated.', tone: 'ok' },
   deleted: { text: 'Your ride was deleted.', tone: 'ok' },
-  error: { text: 'Something went wrong. Please try again.', tone: 'error' },
 };
 
 export default async function MyRidesPage({
@@ -25,9 +26,26 @@ export default async function MyRidesPage({
   if (!user) redirect('/login?next=/my-rides');
 
   const params = await searchParams;
-  const noticeKey = ['posted', 'updated', 'deleted', 'error'].find((key) => firstParam(params[key]));
-  const notice = noticeKey ? NOTICES[noticeKey] : undefined;
+  const errorCode = firstParam(params.error);
+  let notice: { text: string; tone: 'ok' | 'error' } | undefined;
+  if (errorCode) {
+    notice = {
+      text: bookingErrorMessage(isBookingErrorCode(errorCode) ? errorCode : 'unknown'),
+      tone: 'error',
+    };
+  } else if (firstParam(params.notice) === 'ride-cancelled') {
+    notice = { text: 'Your ride was cancelled and its bookings were cancelled with it.', tone: 'ok' };
+  } else {
+    const key = ['posted', 'updated', 'deleted'].find((k) => firstParam(params[k]));
+    notice = key ? NOTICES[key] : undefined;
+  }
   const { upcoming, past } = await getMyRides(user.id);
+  let counts: Record<string, BookingCounts> = {};
+  try {
+    counts = await getBookingCounts([...upcoming, ...past].map((ride) => ride.id));
+  } catch {
+    // The list still works without the booking counts.
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-10">
@@ -63,7 +81,7 @@ export default async function MyRidesPage({
           <ul className="mt-3 space-y-4">
             {upcoming.map((ride) => (
               <li key={ride.id}>
-                <MyRideCard ride={ride} editable />
+                <MyRideCard ride={ride} editable counts={counts[ride.id]} />
               </li>
             ))}
           </ul>
@@ -78,7 +96,7 @@ export default async function MyRidesPage({
           <ul className="mt-3 space-y-4">
             {past.map((ride) => (
               <li key={ride.id}>
-                <MyRideCard ride={ride} editable={false} />
+                <MyRideCard ride={ride} editable={false} counts={counts[ride.id]} />
               </li>
             ))}
           </ul>
